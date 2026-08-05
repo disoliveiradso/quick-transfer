@@ -6,6 +6,15 @@ import type { ScannedQRInfo } from './receiver/qrScanner';
 import { AudioFeedback } from './receiver/audioFeedback';
 import { getReceivedChunksCount, assembleFile, clearFile } from './db/storage';
 
+interface UserSettings {
+  isCustom: boolean;
+  matrixSize: 'auto' | '1x1' | '2x2' | '3x3';
+  bytesPerQr: number;
+  autoTimerSec: number;
+}
+
+const SETTINGS_STORAGE_KEY = 'quick_transfer_user_settings';
+
 // ESTADO DA APLICAÇÃO
 let selectedFile: File | null = null;
 let currentPages: ChunkPayload[][] = [];
@@ -14,6 +23,9 @@ let itemsPerPage: number = 4;
 let bytesPerQr: number = 2000;
 let autoTimerSec: number = 0;
 let autoTimerIntervalId: number | null = null;
+
+// Estado de Configurações
+let userSettings: UserSettings = loadSettingsFromLocalStorage();
 
 // Scanner & Feedback
 const scanner = new ScannerEngine();
@@ -28,10 +40,18 @@ const tabReceiveBtn = document.getElementById('tab-receive-btn') as HTMLButtonEl
 const transmitterSection = document.getElementById('transmitter-section') as HTMLElement;
 const receiverSection = document.getElementById('receiver-section') as HTMLElement;
 
-// Transmissor Elements
+// Modal & Configurações Elements
+const settingsToggleBtn = document.getElementById('settings-toggle-btn') as HTMLButtonElement;
+const settingsModal = document.getElementById('settings-modal') as HTMLElement;
+const closeSettingsBtn = document.getElementById('close-settings-btn') as HTMLButtonElement;
+const saveSettingsBtn = document.getElementById('save-settings-btn') as HTMLButtonElement;
+const resetAutoSettingsBtn = document.getElementById('reset-auto-settings-btn') as HTMLButtonElement;
+
 const matrixSizeSelect = document.getElementById('matrix-size-select') as HTMLSelectElement;
 const qrDensityInput = document.getElementById('qr-density-input') as HTMLInputElement;
 const autoTimerInput = document.getElementById('auto-timer-input') as HTMLInputElement;
+
+// Transmissor Elements
 const fileDropzone = document.getElementById('file-dropzone') as HTMLElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const transmitterDisplayCard = document.getElementById('transmitter-display-card') as HTMLElement;
@@ -54,10 +74,80 @@ const downloadFileBtn = document.getElementById('download-file-btn') as HTMLButt
 const resetRxBtn = document.getElementById('reset-rx-btn') as HTMLButtonElement;
 const alertToast = document.getElementById('alert-toast') as HTMLElement;
 
-// EVENT LISTENERS & INICIALIZAÇÃO
+// INICIALIZAÇÃO
 function init() {
   setupTabs();
+  setupSettingsModal();
   setupTransmitterEvents();
+  syncUIWithSettings();
+}
+
+function loadSettingsFromLocalStorage(): UserSettings {
+  const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch (_) {}
+  }
+  return {
+    isCustom: false,
+    matrixSize: 'auto',
+    bytesPerQr: 2000,
+    autoTimerSec: 0
+  };
+}
+
+function saveSettingsToLocalStorage(settings: UserSettings) {
+  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+}
+
+function syncUIWithSettings() {
+  matrixSizeSelect.value = userSettings.matrixSize;
+  qrDensityInput.value = userSettings.bytesPerQr.toString();
+  autoTimerInput.value = userSettings.autoTimerSec.toString();
+}
+
+// Configurações e Modal
+function setupSettingsModal() {
+  settingsToggleBtn.addEventListener('click', () => {
+    syncUIWithSettings();
+    settingsModal.style.display = 'flex';
+  });
+
+  closeSettingsBtn.addEventListener('click', () => {
+    settingsModal.style.display = 'none';
+  });
+
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+      settingsModal.style.display = 'none';
+    }
+  });
+
+  saveSettingsBtn.addEventListener('click', () => {
+    userSettings = {
+      isCustom: true,
+      matrixSize: matrixSizeSelect.value as UserSettings['matrixSize'],
+      bytesPerQr: parseInt(qrDensityInput.value, 10) || 2000,
+      autoTimerSec: parseInt(autoTimerInput.value, 10) || 0
+    };
+    saveSettingsToLocalStorage(userSettings);
+    settingsModal.style.display = 'none';
+    rebuildTransmission();
+  });
+
+  resetAutoSettingsBtn.addEventListener('click', () => {
+    userSettings = {
+      isCustom: false,
+      matrixSize: 'auto',
+      bytesPerQr: 2000,
+      autoTimerSec: 0
+    };
+    saveSettingsToLocalStorage(userSettings);
+    syncUIWithSettings();
+    settingsModal.style.display = 'none';
+    rebuildTransmission();
+  });
 }
 
 // Alternância de Abas
@@ -85,27 +175,6 @@ function switchTab(tab: 'send' | 'receive') {
 
 // LÓGICA DO TRANSMISSOR
 function setupTransmitterEvents() {
-  matrixSizeSelect.addEventListener('change', () => {
-    const val = matrixSizeSelect.value;
-    if (val === '1x1') itemsPerPage = 1;
-    else if (val === '2x2') itemsPerPage = 4;
-    else if (val === '3x3') itemsPerPage = 9;
-    qrGridContainer.setAttribute('data-matrix', val);
-    rebuildTransmission();
-  });
-
-  qrDensityInput.addEventListener('change', () => {
-    bytesPerQr = parseInt(qrDensityInput.value, 10) || 2000;
-    rebuildTransmission();
-  });
-
-  autoTimerInput.addEventListener('change', () => {
-    autoTimerSec = parseInt(autoTimerInput.value, 10) || 0;
-    if (autoTimerSec > 0 && autoTimerIntervalId) {
-      restartAutoTimer();
-    }
-  });
-
   fileDropzone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     const files = (e.target as HTMLInputElement).files;
@@ -138,15 +207,52 @@ function setupTransmitterEvents() {
   });
 }
 
+/**
+ * Ajusta automaticamente o tamanho da matriz e a densidade com base no tamanho do arquivo
+ */
+function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; items: number; bytes: number } {
+  // Se o usuário especificou configurações personalizadas e salvas, respeita a escolha
+  if (userSettings.isCustom && userSettings.matrixSize !== 'auto') {
+    let items = 4;
+    if (userSettings.matrixSize === '1x1') items = 1;
+    if (userSettings.matrixSize === '3x3') items = 9;
+    return {
+      matrixStr: userSettings.matrixSize,
+      items,
+      bytes: userSettings.bytesPerQr
+    };
+  }
+
+  // Lógica Automática:
+  // < 200 KB => 1x1 (1 QR Code por tela simples e grande)
+  // 200 KB a 2 MB => 2x2 (4 QR Codes por tela equilibrado)
+  // > 2 MB => 3x3 (9 QR Codes por tela para alta transferência)
+  if (fileSize < 200 * 1024) {
+    return { matrixStr: '1x1', items: 1, bytes: userSettings.isCustom ? userSettings.bytesPerQr : 2000 };
+  } else if (fileSize < 2 * 1024 * 1024) {
+    return { matrixStr: '2x2', items: 4, bytes: userSettings.isCustom ? userSettings.bytesPerQr : 2200 };
+  } else {
+    return { matrixStr: '3x3', items: 9, bytes: userSettings.isCustom ? userSettings.bytesPerQr : 2500 };
+  }
+}
+
 async function rebuildTransmission() {
   if (!selectedFile) return;
   
   transmitterDisplayCard.style.display = 'flex';
+
+  const autoConfig = applyAutomaticSettings(selectedFile.size);
+  itemsPerPage = autoConfig.items;
+  bytesPerQr = autoConfig.bytes;
+  autoTimerSec = userSettings.autoTimerSec;
+
+  qrGridContainer.setAttribute('data-matrix', autoConfig.matrixStr);
+
   const { pages, totalChunks } = await chunkFileForGrid(selectedFile, bytesPerQr, itemsPerPage);
   currentPages = pages;
   currentPageIndex = 0;
 
-  txFileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)}) • ${totalChunks} QRs no total`;
+  txFileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)}) • Grid ${autoConfig.matrixStr} (${totalChunks} QRs)`;
   renderCurrentTransmitterPage();
 }
 
@@ -191,11 +297,6 @@ function startAutoTimer() {
     }
     renderCurrentTransmitterPage();
   }, interval);
-}
-
-function restartAutoTimer() {
-  stopAutoTimer();
-  startAutoTimer();
 }
 
 function stopAutoTimer() {
