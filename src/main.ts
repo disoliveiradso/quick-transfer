@@ -395,7 +395,7 @@ async function rebuildTransmission() {
 
   // Usa apenas o primeiro arquivo na fila por enquanto
   const file = selectedFiles[0];
-  const maxSafePayload = 1500; // Base64 chunk size
+  const maxSafePayload = 600; // Base64 chunk size limit for bigger QR code modules
   
   txFountainEncoder = await initializeFountainEncoder(file, maxSafePayload);
   txFountainGenerator = txFountainEncoder.fountain();

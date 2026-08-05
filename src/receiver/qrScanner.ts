@@ -37,8 +37,14 @@ export class ScannerEngine {
       }
     };
 
+    // Constraint com tentativa de forçar câmera traseira em 1080p ou 720p, e foco contínuo se suportado
     const constraints: MediaStreamConstraints = {
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } }
+      video: { 
+        facingMode: 'environment', 
+        width: { ideal: 1280 }, 
+        height: { ideal: 720 }, 
+        advanced: [{ focusMode: 'continuous' }] as any 
+      }
     };
 
     try {
@@ -79,7 +85,8 @@ export class ScannerEngine {
     if (!this.isScanning || !this.videoElement || !this.worker) return;
 
     const now = performance.now();
-    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx && !this.isWorkerProcessingFrame && (now - this.lastScanTime > 30)) {
+    // Throttling agressivo: 10 a 15 quadros por segundo (100ms) para 0 aquecimento no mobile
+    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx && !this.isWorkerProcessingFrame && (now - this.lastScanTime > 100)) {
       this.lastScanTime = now;
 
       let videoW = this.videoElement.videoWidth;
