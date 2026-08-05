@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-CKrxeIsS.js"></script>
-    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-C3SOI8yI.css">
+    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-CpEjYgex.js"></script>
+    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-Dc2pawuY.css">
   <link rel="manifest" href="/quick-transfer-pwa/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer-pwa/registerSW.js"></script></head>
   <body>
     <!-- App Header -->
@@ -19,56 +19,77 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
         <span>Quick Transfer</span>
       </div>
-      <nav class="nav-tabs">
-        <button id="tab-send-btn" class="tab-btn active">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          Enviar (Transmissor)
-        </button>
-        <button id="tab-receive-btn" class="tab-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Receber (Receptor)
-        </button>
-      </nav>
+      <button id="settings-toggle-btn" class="icon-btn" title="Configurações de Transmissão">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
     </header>
+
+    <!-- Modal de Configurações Discreto -->
+    <div id="settings-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Configurações de Transmissão</h3>
+          <button id="close-settings-btn" class="close-btn">&times;</button>
+        </div>
+        <div class="controls-grid" style="margin-top: 1rem;">
+          <div class="control-group">
+            <label for="matrix-size-select">Tamanho da Matriz (Grid)</label>
+            <select id="matrix-size-select">
+              <option value="auto">Automático (Baseado no tamanho do arquivo)</option>
+              <option value="1x1">1x1 (1 QR Code por tela)</option>
+              <option value="2x2">2x2 (4 QR Codes por tela)</option>
+              <option value="3x3">3x3 (9 QR Codes por tela)</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="qr-density-input">Bytes por QR Code</label>
+            <input type="number" id="qr-density-input" value="2000" min="500" max="2900" step="100" />
+          </div>
+          <div class="control-group">
+            <label for="auto-timer-input">Timer Automático (segundos)</label>
+            <input type="number" id="auto-timer-input" value="0" min="0" max="60" placeholder="0 = Manual" />
+          </div>
+        </div>
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; justify-content: flex-end; flex-wrap: wrap;">
+          <button id="reset-auto-settings-btn" class="btn btn-secondary" style="font-size: 0.85rem;">
+            Voltar para Modo Automático
+          </button>
+          <button id="save-settings-btn" class="btn" style="font-size: 0.85rem;">
+            Salvar e Manter Configuração
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Main Container -->
     <main class="main-container">
-      
+
+      <!-- File Upload Area (Topo) -->
+      <div class="card" style="margin-bottom: 1rem;">
+        <div id="file-dropzone" class="file-dropzone">
+          <input type="file" id="file-input" />
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p style="font-weight: 600; margin-bottom: 0.25rem;">Clique para selecionar um arquivo</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Qualquer formato é suportado</p>
+        </div>
+      </div>
+
+      <!-- Abas Ajustadas à Largura da Área de Arquivo (Abaixo do File Upload) -->
+      <div style="margin-bottom: 1.5rem;">
+        <nav class="nav-tabs full-width-tabs">
+          <button id="tab-send-btn" class="tab-btn active">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Enviar (Transmissor)
+          </button>
+          <button id="tab-receive-btn" class="tab-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Receber (Receptor)
+          </button>
+        </nav>
+      </div>
+
       <!-- TRANSMITTER SECTION -->
       <section id="transmitter-section" class="view-section active">
-        <!-- Configuration Card -->
-        <div class="card">
-          <h2 class="card-title">Configurações de Transmissão</h2>
-          <div class="controls-grid">
-            <div class="control-group">
-              <label for="matrix-size-select">Tamanho da Matriz (Grid)</label>
-              <select id="matrix-size-select">
-                <option value="1x1">1x1 (1 QR Code por tela)</option>
-                <option value="2x2" selected>2x2 (4 QR Codes por tela)</option>
-                <option value="3x3">3x3 (9 QR Codes por tela)</option>
-              </select>
-            </div>
-            <div class="control-group">
-              <label for="qr-density-input">Bytes por QR Code</label>
-              <input type="number" id="qr-density-input" value="2000" min="500" max="2900" step="100" />
-            </div>
-            <div class="control-group">
-              <label for="auto-timer-input">Timer Automático (segundos)</label>
-              <input type="number" id="auto-timer-input" value="0" min="0" max="60" placeholder="0 = Manual" />
-            </div>
-          </div>
-        </div>
-
-        <!-- File Upload Area -->
-        <div class="card">
-          <div id="file-dropzone" class="file-dropzone">
-            <input type="file" id="file-input" />
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <p style="font-weight: 600; margin-bottom: 0.25rem;">Clique para selecionar um arquivo</p>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">Qualquer formato é suportado</p>
-          </div>
-        </div>
-
         <!-- QR Grid Display -->
         <div id="transmitter-display-card" class="card grid-display-wrapper" style="display: none;">
           <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
@@ -138,6 +159,15 @@
       </section>
 
     </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>Projeto 100% Código Aberto</span>
+      <a href="https://github.com/disoliveiradso/quick-transfer-pwa" target="_blank" rel="noopener noreferrer" class="github-link">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        Quick Transfer
+      </a>
+    </footer>
 
     <!-- Visual Toast -->
     <div id="alert-toast" class="alert-toast">
