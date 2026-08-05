@@ -399,20 +399,33 @@ function drawOverlayFeedbacks(results: ScannedQRInfo[]) {
   ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
 
   results.forEach(res => {
-    if (res.points && res.points.length >= 1) {
-      const p1 = res.points[0];
+    if (res.position) {
+      const { topLeft, topRight, bottomRight, bottomLeft } = res.position;
 
-      // Desenha caixa verde sobre o QR Code lido
+      // Desenha o polígono delimitador sobre o QR Code lido
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(p1.getX(), p1.getY(), 15, 0, 2 * Math.PI);
+      ctx.moveTo(topLeft.x, topLeft.y);
+      ctx.lineTo(topRight.x, topRight.y);
+      ctx.lineTo(bottomRight.x, bottomRight.y);
+      ctx.lineTo(bottomLeft.x, bottomLeft.y);
+      ctx.closePath();
       ctx.stroke();
 
-      // Descreve ícone CHECK (✓)
+      // Fundo semi-transparente verde no QR lido
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      ctx.fill();
+
+      // Desenha o ícone de Check verde (✓) no centro do QR Code
+      const centerX = (topLeft.x + bottomRight.x) / 2;
+      const centerY = (topLeft.y + bottomRight.y) / 2;
+
       ctx.fillStyle = '#10b981';
-      ctx.font = 'bold 20px Inter, sans-serif';
-      ctx.fillText('✓', p1.getX() - 6, p1.getY() + 6);
+      ctx.font = 'bold 26px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✓', centerX, centerY);
     }
   });
 
