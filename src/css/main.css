@@ -90,13 +90,12 @@ body {
 /* Container principal */
 .main-container {
   flex: 1;
-  max-width: 520px;
+  max-width: 1000px;
   width: 100%;
   margin: 0 auto;
-  padding: 1rem 1rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
 
 .view-section {
@@ -702,8 +701,8 @@ input[type=number]:hover::-webkit-outer-spin-button {
 .app-footer {
   background: transparent;
   border-top: none;
-  padding: 0.75rem 1rem;
-  margin-top: 0.5rem;
+  padding: 1.5rem 1rem 2rem 1rem;
+  margin-top: auto;
   display: flex;
   justify-content: center;
   align-items: center;
