@@ -10,8 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/quick-transfer/assets/index-BJ_RKQu-.js"></script>
-    <link rel="stylesheet" crossorigin href="/quick-transfer/assets/index-DLhjvLm9.css">
+    <script type="module" crossorigin src="/quick-transfer/assets/index-I9nyWgRl.js"></script>
+    <link rel="stylesheet" crossorigin href="/quick-transfer/assets/index-BgLrZR8k.css">
   <link rel="manifest" href="/quick-transfer/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer/registerSW.js"></script></head>
   <body>
     <!-- App Header -->
@@ -85,7 +85,7 @@
         </button>
       </section>
 
-      <!-- SEÇÃO 2: SCANNER (Transmissor escaneia ou digita o código do Receptor) -->
+      <!-- SEÇÃO 2: SCANNER / CONECTAR (Transmissor) -->
       <section id="scanner-section" class="view-section">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
           <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -97,21 +97,37 @@
           <span id="scanner-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Conectar ao Receptor</span>
         </div>
 
-        <div class="card scanner-wrapper-34" style="position: relative; overflow: hidden; margin-bottom: 0.75rem;">
-          <video id="scanner-video" playsinline></video>
-          <canvas id="scanner-overlay" style="z-index: 10;"></canvas>
-        </div>
-        <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.75rem;">
-          Aponte a câmera para o QR Code exibido no Receptor.
-        </p>
-
-        <!-- Conexão por código manual -->
-        <div class="card" style="padding: 1rem; text-align: center;">
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 500;">Ou digite o código de conexão exibido no Receptor:</p>
+        <!-- 1. Digitar Código Manual (Acima) -->
+        <div class="card" style="padding: 1rem; text-align: center; margin-bottom: 0.75rem;">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">Digite o código de conexão exibido no Receptor:</p>
           <div style="display: flex; gap: 0.5rem;">
             <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 600; text-transform: uppercase; text-align: center; font-size: 0.95rem; outline: none;" />
             <button id="connect-code-btn" class="btn" style="background: var(--accent-primary);">Conectar</button>
           </div>
+        </div>
+
+        <div style="display: flex; align-items: center; margin: 0.5rem 0 0.75rem 0;">
+          <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+          <span style="padding: 0 1rem; color: var(--text-muted); font-size: 0.8rem; font-weight: 600;">OU</span>
+          <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+        </div>
+
+        <!-- 2. Botão para Abrir Câmera e Área da Câmera Quadrada -->
+        <div id="camera-trigger-container" style="text-align: center;">
+          <button id="open-camera-btn" class="btn btn-secondary full-width-btn" style="padding: 0.75rem; font-size: 0.95rem; margin-bottom: 0.75rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Escanear QR Code com a Câmera
+          </button>
+        </div>
+
+        <div id="camera-preview-wrapper" style="display: none; flex-direction: column; align-items: center; margin-bottom: 0.75rem;">
+          <div class="card scanner-wrapper-34" style="position: relative; overflow: hidden; margin-bottom: 0.75rem;">
+            <video id="scanner-video" playsinline></video>
+            <canvas id="scanner-overlay" style="z-index: 10;"></canvas>
+          </div>
+          <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+            Aponte a câmera para o QR Code exibido no Receptor.
+          </p>
         </div>
       </section>
 
@@ -127,15 +143,16 @@
           <span id="qr-display-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Modo Receptor</span>
         </div>
 
-        <div class="card grid-display-wrapper" style="padding: 1rem; text-align: center;">
-          <p id="qr-instruction" style="margin-bottom: 0.75rem; font-weight: 600;">Escaneie este código no dispositivo transmissor:</p>
-          <div id="qr-container" style="display: flex; justify-content: center; background: white; padding: 0.5rem; border-radius: 8px; margin-bottom: 0.75rem;">
-            <canvas id="qr-canvas" style="max-width: 100%; height: auto;"></canvas>
+        <div class="card grid-display-wrapper" style="padding: 1.25rem 1rem; text-align: center;">
+          <p id="qr-instruction" style="margin-bottom: 0.85rem; font-weight: 600; font-size: 0.95rem;">Escaneie este código no dispositivo transmissor:</p>
+          
+          <div id="qr-container" style="display: flex; justify-content: center; align-items: center; background: white; padding: 0.75rem; border-radius: 12px; margin: 0 auto 1.25rem auto; width: fit-content; max-width: 100%;">
+            <canvas id="qr-canvas" style="display: block; width: 280px; height: 280px; max-width: 100%; height: auto;"></canvas>
           </div>
           
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 0.5rem;">
-            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Código de Conexão Manual:</p>
-            <p id="session-code-display" style="font-size: 1.25rem; font-weight: 700; letter-spacing: 2px; color: var(--accent-primary);">Aguardando...</p>
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 1rem; border-radius: 10px; width: 100%; box-sizing: border-box;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500; display: block;">Código de Conexão Manual:</p>
+            <p id="session-code-display" style="font-size: 1.4rem; font-weight: 700; letter-spacing: 3px; color: var(--accent-primary); margin: 0.25rem 0; line-height: 1.3;">Aguardando...</p>
           </div>
         </div>
       </section>
