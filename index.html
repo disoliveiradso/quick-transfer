@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-D7b_K3WM.js"></script>
+    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-B-24nolR.js"></script>
     <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-ukP6PlJC.css">
   <link rel="manifest" href="/quick-transfer-pwa/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer-pwa/registerSW.js"></script></head>
   <body>
@@ -39,7 +39,7 @@
         <!-- File Upload Area -->
         <div class="card" style="margin-bottom: 1rem;">
           <div id="file-dropzone" class="file-dropzone">
-            <input type="file" id="file-input" />
+            <input type="file" id="file-input" multiple />
             <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <p style="font-weight: 600; margin-bottom: 0.25rem; white-space: normal;">Clique para selecionar um arquivo</p>
             <p style="font-size: 0.85rem; color: var(--text-muted); white-space: normal;">Qualquer formato é suportado</p>
@@ -61,33 +61,30 @@
         </div>
 
         <!-- File Preview Area (Hidden by default) -->
-        <div id="file-preview-container" class="card" style="display: none; margin-bottom: 1rem; text-align: center;">
-          <h3 style="margin-bottom: 0.5rem; font-size: 1.05rem;">Arquivo Selecionado:</h3>
-          
-          <div id="preview-media-wrapper" style="margin-bottom: 1rem; display: flex; justify-content: center; align-items: center; max-height: 250px; overflow: hidden; border-radius: 8px; background: var(--bg-secondary);">
-            <!-- Preview content injected here -->
+        <div id="file-preview-container" class="card" style="display: none; margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin-bottom: 0; font-size: 1.05rem;">Arquivos Selecionados:</h3>
+            <button id="toggle-view-btn" class="icon-btn" title="Alternar Visualização" style="background: var(--bg-secondary); padding: 0.5rem; border-radius: 6px;">
+              <!-- Default List Icon -->
+              <svg id="view-icon-list" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+              <!-- Grid Icon (Hidden by default) -->
+              <svg id="view-icon-grid" style="display: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </button>
           </div>
           
-          <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
-            <span id="preview-file-icon"></span>
-            <span id="preview-file-name" style="word-break: break-all;"></span>
+          <div id="file-list-wrapper" style="max-height: 350px; overflow-y: auto; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+            <!-- Injected by JS -->
           </div>
-          <div id="preview-file-ext" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;"></div>
 
           <div style="display: flex; gap: 0.75rem; flex-direction: column;">
             <button id="start-transfer-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               Iniciar Envio
             </button>
-            <div style="display: flex; gap: 0.75rem;">
-              <button id="add-another-file-btn" class="btn btn-secondary full-width-btn" style="flex: 1;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Selecionar Outro Arquivo
-              </button>
-              <button id="remove-file-btn" class="btn btn-secondary" style="flex: 0; padding: 0 1rem; color: #ef4444; border-color: #ef4444;" title="Excluir Arquivo">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-              </button>
-            </div>
+            <button id="add-another-file-btn" class="btn btn-secondary full-width-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Adicionar Mais Arquivos
+            </button>
           </div>
         </div>
       </section>
