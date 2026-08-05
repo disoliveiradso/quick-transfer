@@ -48,7 +48,11 @@ const closeSettingsBtn = document.getElementById('close-settings-btn') as HTMLBu
 const saveSettingsBtn = document.getElementById('save-settings-btn') as HTMLButtonElement;
 const resetAutoSettingsBtn = document.getElementById('reset-auto-settings-btn') as HTMLButtonElement;
 
-const matrixSizeSelect = document.getElementById('matrix-size-select') as HTMLSelectElement;
+// Custom Select Elements
+const customMatrixSelect = document.getElementById('custom-matrix-select') as HTMLElement;
+const customSelectValue = document.getElementById('custom-select-value') as HTMLElement;
+const customOptions = document.querySelectorAll('.custom-option');
+
 const qrDensityInput = document.getElementById('qr-density-input') as HTMLInputElement;
 const autoTimerInput = document.getElementById('auto-timer-input') as HTMLInputElement;
 
@@ -85,6 +89,7 @@ const alertToast = document.getElementById('alert-toast') as HTMLElement;
 function init() {
   setupTabs();
   setupSettingsModal();
+  setupCustomSelect();
   setupAppDialogModal();
   setupTransmitterEvents();
   syncUIWithSettings();
@@ -130,9 +135,45 @@ function saveSettingsToLocalStorage(settings: UserSettings) {
 }
 
 function syncUIWithSettings() {
-  matrixSizeSelect.value = userSettings.matrixSize;
+  updateCustomSelectUI(userSettings.matrixSize);
   qrDensityInput.value = userSettings.bytesPerQr.toString();
   autoTimerInput.value = userSettings.autoTimerSec.toString();
+}
+
+// Configuração do Custom Select Dropdown
+function setupCustomSelect() {
+  const trigger = customMatrixSelect.querySelector('.custom-select-trigger');
+  
+  trigger?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    customMatrixSelect.classList.toggle('open');
+  });
+
+  document.addEventListener('click', () => {
+    customMatrixSelect.classList.remove('open');
+  });
+
+  customOptions.forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = (opt as HTMLElement).dataset.value as UserSettings['matrixSize'];
+      updateCustomSelectUI(val);
+      customMatrixSelect.classList.remove('open');
+    });
+  });
+}
+
+function updateCustomSelectUI(val: UserSettings['matrixSize']) {
+  customOptions.forEach(opt => {
+    const optEl = opt as HTMLElement;
+    if (optEl.dataset.value === val) {
+      optEl.classList.add('selected');
+      customSelectValue.textContent = optEl.textContent || '';
+    } else {
+      optEl.classList.remove('selected');
+    }
+  });
+  customMatrixSelect.dataset.value = val;
 }
 
 // Configurações e Modal
@@ -153,9 +194,10 @@ function setupSettingsModal() {
   });
 
   saveSettingsBtn.addEventListener('click', () => {
+    const selectedMatrix = (customMatrixSelect.dataset.value as UserSettings['matrixSize']) || '2x2';
     userSettings = {
       isCustom: true,
-      matrixSize: matrixSizeSelect.value as UserSettings['matrixSize'],
+      matrixSize: selectedMatrix,
       bytesPerQr: parseInt(qrDensityInput.value, 10) || 2000,
       autoTimerSec: parseInt(autoTimerInput.value, 10) || 0
     };
