@@ -719,13 +719,12 @@ input[type=number]:hover::-webkit-outer-spin-button {
   color: var(--text-main);
 }
 
-/* Footer */
+/* Footer (Exibido apenas na tela inicial) */
 .app-footer {
   background: transparent;
   border-top: none;
-  padding: 1rem 1rem max(1.75rem, calc(1.25rem + env(safe-area-inset-bottom))) 1rem;
-  margin-top: clamp(1rem, 3vh, 2rem);
-  margin-bottom: env(safe-area-inset-bottom);
+  padding: 1.25rem 1rem max(1.5rem, calc(1rem + env(safe-area-inset-bottom))) 1rem;
+  margin-top: 1.5rem;
   display: flex;
   justify-content: center;
   align-items: center;

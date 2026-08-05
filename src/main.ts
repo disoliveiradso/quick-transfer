@@ -210,14 +210,21 @@ function init() {
     startReceiverFlow();
   });
 
-  // Conexão por código manual no Transmissor
+  // Conexão por código manual no Transmissor (Preenche automaticamente o prefixo QT-)
+  manualCodeInput.addEventListener('input', () => {
+    // Remove qualquer prefixo QT- que o usuário tente digitar ou colar
+    let cleanVal = manualCodeInput.value.toUpperCase().replace(/^QT-?/, '').replace(/[^A-Z0-9]/g, '');
+    manualCodeInput.value = cleanVal;
+  });
+
   connectCodeBtn.addEventListener('click', () => {
-    const code = manualCodeInput.value.trim().toUpperCase();
-    if (!code) {
-      showDialog("Por favor, digite o código do Receptor.");
+    const rawCode = manualCodeInput.value.trim().toUpperCase().replace(/^QT-?/, '');
+    if (!rawCode) {
+      showDialog("Por favor, digite o código exibido no Receptor.");
       return;
     }
-    handleSenderConnect(code);
+    const fullCode = `QT-${rawCode}`;
+    handleSenderConnect(fullCode);
   });
 
   manualCodeInput.addEventListener('keypress', (e) => {
@@ -603,6 +610,16 @@ function showView(section: HTMLElement, pushState: boolean = true) {
   qrDisplaySection.classList.remove('active');
   transferSection.classList.remove('active');
   section.classList.add('active');
+
+  // O botão do GitHub / footer só deve aparecer na tela inicial (homeSection)
+  const footer = document.querySelector('.app-footer') as HTMLElement;
+  if (footer) {
+    if (section === homeSection) {
+      footer.style.display = 'flex';
+    } else {
+      footer.style.display = 'none';
+    }
+  }
 
   if (pushState && section !== homeSection) {
     history.pushState({ viewId: section.id }, '', `#${section.id}`);
