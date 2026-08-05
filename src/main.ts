@@ -49,10 +49,12 @@ const addAnotherFileBtn = document.getElementById('add-another-file-btn') as HTM
 const txFileInfo = document.getElementById('tx-file-info') as HTMLElement;
 const txPageIndicator = document.getElementById('tx-page-indicator') as HTMLElement;
 const txQrContainer = document.getElementById('tx-qr-container') as HTMLElement;
-const txProgressFill = document.getElementById('tx-progress-fill') as HTMLElement;
 const txSpeedSlider = document.getElementById('tx-speed-slider') as HTMLInputElement;
 const txSpeedLabel = document.getElementById('tx-speed-label') as HTMLElement;
 const txToggleLoopBtn = document.getElementById('tx-toggle-loop-btn') as HTMLButtonElement;
+const txDrawerToggleBtn = document.getElementById('tx-drawer-toggle-btn') as HTMLButtonElement;
+const txDrawer = document.getElementById('tx-drawer') as HTMLElement;
+const txDrawerIcon = document.getElementById('tx-drawer-icon') as unknown as SVGElement;
 
 // RECEPTOR DISPLAY
 const rxScannerVideo = document.getElementById('rx-scanner-video') as HTMLVideoElement;
@@ -362,6 +364,16 @@ function setupTransmitterEvents() {
       txToggleLoopBtn.textContent = 'Pausar Transmissão';
     }
   });
+
+  txDrawerToggleBtn.addEventListener('click', () => {
+    if (txDrawer.style.display === 'none') {
+      txDrawer.style.display = 'flex';
+      txDrawerIcon.innerHTML = '<polyline points="18 15 12 9 6 15"></polyline>'; // Seta pra cima
+    } else {
+      txDrawer.style.display = 'none';
+      txDrawerIcon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>'; // Seta pra baixo
+    }
+  });
 }
 
 async function rebuildTransmission() {
@@ -384,8 +396,7 @@ async function rebuildTransmission() {
 function startOpticalTransmitter() {
   if (!txFountainGenerator) return;
 
-  txFileInfo.textContent = `Enviando via Fountain: ${selectedFiles[0].name}`;
-  txProgressFill.style.width = '100%';
+  txFileInfo.textContent = `Enviando via Ciclo Contínuo: ${selectedFiles[0].name}`;
   txToggleLoopBtn.textContent = 'Pausar Transmissão';
 
   stopFountainLoop();
@@ -406,7 +417,7 @@ async function transmitNextFountainBlock() {
   if (!block) return; // Generator exhausted (unlikely for fountain)
 
   txBlocksSent++;
-  txPageIndicator.textContent = `Fountain Loop (${txBlocksSent} blocos)`;
+  txPageIndicator.textContent = `Ciclo de Transmissão (${txBlocksSent} blocos)`;
 
   const base64Str = encodeBlockToBase64(block);
   
