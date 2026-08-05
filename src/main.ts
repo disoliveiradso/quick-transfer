@@ -81,6 +81,15 @@ const prevPageBtn = document.getElementById('prev-page-btn') as HTMLButtonElemen
 const nextPageBtn = document.getElementById('next-page-btn') as HTMLButtonElement;
 const autoToggleBtn = document.getElementById('auto-toggle-btn') as HTMLButtonElement;
 
+// Preview Elements
+const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
+const previewMediaWrapper = document.getElementById('preview-media-wrapper') as HTMLElement;
+const previewFileIcon = document.getElementById('preview-file-icon') as HTMLElement;
+const previewFileName = document.getElementById('preview-file-name') as HTMLElement;
+const previewFileExt = document.getElementById('preview-file-ext') as HTMLElement;
+const startTransferBtn = document.getElementById('start-transfer-btn') as HTMLButtonElement;
+const addAnotherFileBtn = document.getElementById('add-another-file-btn') as HTMLButtonElement;
+
 // Receptor Elements & Foto Snapshot
 const scannerVideo = document.getElementById('scanner-video') as HTMLVideoElement;
 const scannerOverlay = document.getElementById('scanner-overlay') as HTMLCanvasElement;
@@ -367,16 +376,84 @@ function setupDisplayControls() {
   });
 }
 
+function getFileIcon(type: string, ext: string): string {
+  if (type.startsWith('audio/')) return '🎵';
+  if (type.startsWith('video/')) return '🎬';
+  if (type.startsWith('image/')) return '🖼️';
+  if (type.startsWith('text/')) return '📄';
+  if (ext === 'pdf') return '📑';
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return '🗜️';
+  if (['exe', 'apk', 'bin', 'msi'].includes(ext)) return '⚙️';
+  return '📁';
+}
+
+function handleFileSelection(file: File) {
+  selectedFile = file;
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const type = file.type;
+
+  previewFileName.textContent = file.name;
+  previewFileExt.textContent = `${ext.toUpperCase()} • ${formatBytes(file.size)}`;
+  previewFileIcon.textContent = getFileIcon(type, ext);
+
+  previewMediaWrapper.innerHTML = '';
+  
+  let hasPreview = false;
+  if (type.startsWith('image/')) {
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '250px';
+    img.style.objectFit = 'contain';
+    img.style.borderRadius = '8px';
+    previewMediaWrapper.appendChild(img);
+    hasPreview = true;
+  } else if (type.startsWith('video/')) {
+    const vid = document.createElement('video');
+    vid.src = URL.createObjectURL(file);
+    vid.controls = true;
+    vid.style.maxWidth = '100%';
+    vid.style.maxHeight = '250px';
+    vid.style.borderRadius = '8px';
+    previewMediaWrapper.appendChild(vid);
+    hasPreview = true;
+  } else if (type.startsWith('audio/')) {
+    const aud = document.createElement('audio');
+    aud.src = URL.createObjectURL(file);
+    aud.controls = true;
+    aud.style.width = '100%';
+    aud.style.marginTop = '1rem';
+    aud.style.marginBottom = '1rem';
+    previewMediaWrapper.appendChild(aud);
+    hasPreview = true;
+  }
+
+  previewMediaWrapper.style.display = hasPreview ? 'flex' : 'none';
+  filePreviewContainer.style.display = 'block';
+  
+  // Oculta a área de dropzone principal já que a visualização assumiu
+  if (fileDropzone.parentElement) {
+    fileDropzone.parentElement.style.display = 'none';
+  }
+}
+
 // LÓGICA DO TRANSMISSOR
 function setupTransmitterEvents() {
   fileDropzone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     const files = (e.target as HTMLInputElement).files;
     if (files && files[0]) {
-      selectedFile = files[0];
+      handleFileSelection(files[0]);
+    }
+  });
+
+  startTransferBtn.addEventListener('click', () => {
+    if (selectedFile) {
       rebuildTransmission();
     }
   });
+
+  addAnotherFileBtn.addEventListener('click', () => fileInput.click());
 
   prevPageBtn.addEventListener('click', () => {
     if (currentPageIndex > 0) {

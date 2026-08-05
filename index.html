@@ -101,6 +101,32 @@
             </button>
           </nav>
         </div>
+
+        <!-- File Preview Area (Hidden by default) -->
+        <div id="file-preview-container" class="card" style="display: none; margin-bottom: 1rem; text-align: center;">
+          <h3 style="margin-bottom: 0.5rem; font-size: 1.05rem;">Arquivo Selecionado:</h3>
+          
+          <div id="preview-media-wrapper" style="margin-bottom: 1rem; display: flex; justify-content: center; align-items: center; max-height: 250px; overflow: hidden; border-radius: 8px; background: var(--bg-secondary);">
+            <!-- Preview content injected here -->
+          </div>
+          
+          <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <span id="preview-file-icon"></span>
+            <span id="preview-file-name" style="word-break: break-all;"></span>
+          </div>
+          <div id="preview-file-ext" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;"></div>
+
+          <div style="display: flex; gap: 0.75rem; flex-direction: column;">
+            <button id="start-transfer-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              Exibir QR Codes para Transferência
+            </button>
+            <button id="add-another-file-btn" class="btn btn-secondary full-width-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Selecionar Outro Arquivo
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- TRANSMITTER DISPLAY DEDICATED SECTION (Página Dedicada de Exibição dos QR Codes) -->
