@@ -128,11 +128,24 @@ function setupTabs() {
   tabReceiveBtn.addEventListener('click', () => showReceiverView(true));
 
   if (backToSendBtn) {
-    backToSendBtn.addEventListener('click', () => showTransmitterUploadView(true));
+    backToSendBtn.addEventListener('click', () => {
+      selectedFiles = [];
+      renderFilesPreview();
+      showTransmitterUploadView(true);
+    });
   }
   if (backToUploadBtn) {
     backToUploadBtn.addEventListener('click', () => showTransmitterUploadView(true));
   }
+}
+
+function resetReceiverState() {
+  rxFountainDecoder = null;
+  rxProgressFill.style.width = '0%';
+  rxProgressText.textContent = '0% recebido';
+  rxChunksText.textContent = '0 blocos coletados';
+  rxFileInfo.textContent = 'Aguardando Fonte de Dados...';
+  downloadFileBtn.style.display = 'none';
 }
 
 function showTransmitterUploadView(pushHistory: boolean) {
@@ -144,6 +157,7 @@ function showTransmitterUploadView(pushHistory: boolean) {
   
   stopFountainLoop();
   rxScanner.stop();
+  resetReceiverState();
 
   if (pushHistory) {
     history.pushState({ tab: 'send', view: 'upload' }, '');
@@ -512,12 +526,7 @@ function drawReceiverOverlayFeedbacks() {
 }
 
 resetRxBtn.addEventListener('click', () => {
-  rxFountainDecoder = null; // Reseta o decodificador
-  rxProgressFill.style.width = '0%';
-  rxProgressText.textContent = '0% recebido';
-  rxChunksText.textContent = '0 blocos coletados';
-  rxFileInfo.textContent = 'Aguardando Fonte de Dados...';
-  downloadFileBtn.style.display = 'none';
+  resetReceiverState();
   
   if (!rxScannerVideo.srcObject) {
     startOpticalReceiver();
