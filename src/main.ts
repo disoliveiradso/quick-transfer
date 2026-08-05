@@ -1,25 +1,26 @@
-import { chunkFileForGrid } from './transmitter/chunker';
-import type { ChunkPayload } from './transmitter/chunker';
+import { initializeFountainEncoder, encodeBlockToBase64 } from './fountain/encoder';
+import { initializeFountainDecoder, feedDecoderWithBase64, extractFileFromDecoder } from './fountain/decoder';
 import { renderQRCodeToCanvas } from './transmitter/qrGenerator';
 import { ScannerEngine } from './receiver/qrScanner';
-import type { ScannedQRInfo } from './receiver/qrScanner';
 import { AudioFeedback } from './receiver/audioFeedback';
-import { getReceivedChunksCount, assembleFile, clearFile } from './db/storage';
+import type { LtEncoder, LtDecoder } from 'luby-transform';
 
 // ESTADO DA APLICAÇÃO - TRANSMISSOR
 let selectedFiles: File[] = [];
-let allChunks: ChunkPayload[] = [];
-let currentChunkIndex: number = 0;
-let previewViewMode: 'list' | 'grid' = 'list'; // 0-based
-let txScanner: ScannerEngine = new ScannerEngine();
+let previewViewMode: 'list' | 'grid' = 'list';
+let txFountainEncoder: LtEncoder | null = null;
+let txFountainGenerator: Generator<any, never> | null = null;
+let txFountainLoopId: number | null = null;
+let txSpeedMs: number = 150;
+let txBlocksSent: number = 0;
+let isTxPaused: boolean = false;
 
 // ESTADO DA APLICAÇÃO - RECEPTOR
 let rxScanner: ScannerEngine = new ScannerEngine();
-let currentFileIdBeingReceived: string | null = null;
+let rxFountainDecoder: LtDecoder | null = null;
 
 // FEEDBACK
 const audio = new AudioFeedback();
-let txSyncLedTimeout: number | null = null;
 
 // ELEMENTOS DOM - NAVEGAÇÃO
 const tabSendBtn = document.getElementById('tab-send-btn') as HTMLButtonElement;
@@ -31,7 +32,6 @@ const backToSendBtn = document.getElementById('back-to-send-btn') as HTMLButtonE
 const transmitterUploadSection = document.getElementById('transmitter-upload-section') as HTMLElement;
 const transmitterDisplaySection = document.getElementById('transmitter-display-section') as HTMLElement;
 const receiverSection = document.getElementById('receiver-section') as HTMLElement;
-
 const fullscreenToggleBtn = document.getElementById('fullscreen-toggle-btn') as HTMLButtonElement;
 
 // PREVIEW UPLOAD
@@ -42,22 +42,21 @@ const fileListWrapper = document.getElementById('file-list-wrapper') as HTMLDivE
 const toggleViewBtn = document.getElementById('toggle-view-btn') as HTMLButtonElement;
 const viewIconList = document.getElementById('view-icon-list') as unknown as SVGElement;
 const viewIconGrid = document.getElementById('view-icon-grid') as unknown as SVGElement;
-
 const startTransferBtn = document.getElementById('start-transfer-btn') as HTMLButtonElement;
 const addAnotherFileBtn = document.getElementById('add-another-file-btn') as HTMLButtonElement;
 
-// TRANSMISSOR DISPLAY (OPTICAL HANDSHAKE)
+// TRANSMISSOR DISPLAY
 const txFileInfo = document.getElementById('tx-file-info') as HTMLElement;
 const txPageIndicator = document.getElementById('tx-page-indicator') as HTMLElement;
 const txQrContainer = document.getElementById('tx-qr-container') as HTMLElement;
 const txProgressFill = document.getElementById('tx-progress-fill') as HTMLElement;
-const txScannerVideo = document.getElementById('tx-scanner-video') as HTMLVideoElement;
-const txSyncLed = document.getElementById('tx-sync-led') as HTMLElement;
+const txSpeedSlider = document.getElementById('tx-speed-slider') as HTMLInputElement;
+const txSpeedLabel = document.getElementById('tx-speed-label') as HTMLElement;
+const txToggleLoopBtn = document.getElementById('tx-toggle-loop-btn') as HTMLButtonElement;
 
-// RECEPTOR DISPLAY (OPTICAL HANDSHAKE)
+// RECEPTOR DISPLAY
 const rxScannerVideo = document.getElementById('rx-scanner-video') as HTMLVideoElement;
 const rxScannerOverlay = document.getElementById('rx-scanner-overlay') as HTMLCanvasElement;
-const rxAckCanvas = document.getElementById('rx-ack-canvas') as HTMLCanvasElement;
 const rxFileInfo = document.getElementById('rx-file-info') as HTMLElement;
 const rxProgressFill = document.getElementById('rx-progress-fill') as HTMLElement;
 const rxProgressText = document.getElementById('rx-progress-text') as HTMLElement;
@@ -117,7 +116,7 @@ function setupTabs() {
   history.replaceState({ tab: 'send', view: 'upload' }, '');
 
   tabSendBtn.addEventListener('click', () => {
-    if (selectedFiles.length > 0 && allChunks.length > 0) {
+    if (selectedFiles.length > 0 && txFountainEncoder) {
       showTransmitterDisplayView(true);
     } else {
       showTransmitterUploadView(true);
@@ -127,11 +126,8 @@ function setupTabs() {
   tabReceiveBtn.addEventListener('click', () => showReceiverView(true));
 
   if (backToSendBtn) {
-    backToSendBtn.addEventListener('click', () => {
-      showTransmitterUploadView(true);
-    });
+    backToSendBtn.addEventListener('click', () => showTransmitterUploadView(true));
   }
-
   if (backToUploadBtn) {
     backToUploadBtn.addEventListener('click', () => showTransmitterUploadView(true));
   }
@@ -140,12 +136,11 @@ function setupTabs() {
 function showTransmitterUploadView(pushHistory: boolean) {
   tabSendBtn.classList.add('active');
   tabReceiveBtn.classList.remove('active');
-  
   transmitterUploadSection.classList.add('active');
   transmitterDisplaySection.classList.remove('active');
   receiverSection.classList.remove('active');
   
-  txScanner.stop();
+  stopFountainLoop();
   rxScanner.stop();
 
   if (pushHistory) {
@@ -156,11 +151,9 @@ function showTransmitterUploadView(pushHistory: boolean) {
 function showTransmitterDisplayView(pushHistory: boolean) {
   tabSendBtn.classList.add('active');
   tabReceiveBtn.classList.remove('active');
-  
   transmitterUploadSection.classList.remove('active');
   transmitterDisplaySection.classList.add('active');
   receiverSection.classList.remove('active');
-  
   rxScanner.stop();
   
   startOpticalTransmitter();
@@ -173,12 +166,11 @@ function showTransmitterDisplayView(pushHistory: boolean) {
 function showReceiverView(pushHistory: boolean) {
   tabReceiveBtn.classList.add('active');
   tabSendBtn.classList.remove('active');
-  
   receiverSection.classList.add('active');
   transmitterUploadSection.classList.remove('active');
   transmitterDisplaySection.classList.remove('active');
   
-  txScanner.stop();
+  stopFountainLoop();
   startOpticalReceiver();
 
   if (pushHistory) {
@@ -209,11 +201,9 @@ function getFileIconSVG(type: string, ext: string): string {
 
 function handleFilesSelection(files: FileList | File[]) {
   if (!files || files.length === 0) return;
-
   for (let i = 0; i < files.length; i++) {
     selectedFiles.push(files[i]);
   }
-  
   renderFilesPreview();
 }
 
@@ -250,13 +240,11 @@ function renderFilesPreview() {
     const item = document.createElement('div');
     if (previewViewMode === 'grid') {
       item.style.cssText = 'display: flex; flex-direction: column; align-items: center; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center; width: 140px; gap: 0.5rem; position: relative;';
-      
       const iconWrap = document.createElement('div');
       iconWrap.innerHTML = getFileIconSVG(type, ext);
       iconWrap.style.transform = 'scale(1.5)';
       iconWrap.style.margin = '0.5rem 0';
       iconWrap.style.color = 'var(--text-main)';
-      
       const textWrap = document.createElement('div');
       textWrap.style.fontSize = '0.85rem';
       textWrap.style.fontWeight = '600';
@@ -265,7 +253,6 @@ function renderFilesPreview() {
       textWrap.style.maxHeight = '3em';
       textWrap.style.overflow = 'hidden';
       textWrap.textContent = file.name;
-      
       const sizeText = document.createElement('div');
       sizeText.style.fontSize = '0.75rem';
       sizeText.style.color = 'var(--text-muted)';
@@ -280,22 +267,17 @@ function renderFilesPreview() {
       item.appendChild(iconWrap);
       item.appendChild(textWrap);
       item.appendChild(sizeText);
-
     } else {
       item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); gap: 1rem;';
-      
       const leftCol = document.createElement('div');
       leftCol.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; overflow: hidden;';
-      
       const iconWrap = document.createElement('div');
       iconWrap.innerHTML = getFileIconSVG(type, ext);
       iconWrap.style.color = 'var(--text-main)';
-      
       const textWrap = document.createElement('div');
       textWrap.style.display = 'flex';
       textWrap.style.flexDirection = 'column';
       textWrap.style.overflow = 'hidden';
-      
       const title = document.createElement('span');
       title.style.fontWeight = '600';
       title.style.fontSize = '0.9rem';
@@ -303,7 +285,6 @@ function renderFilesPreview() {
       title.style.overflow = 'hidden';
       title.style.textOverflow = 'ellipsis';
       title.textContent = file.name;
-      
       const subtitle = document.createElement('span');
       subtitle.style.fontSize = '0.8rem';
       subtitle.style.color = 'var(--text-muted)';
@@ -324,7 +305,6 @@ function renderFilesPreview() {
       item.appendChild(leftCol);
       item.appendChild(removeBtn);
     }
-    
     fileListWrapper.appendChild(item);
   });
 }
@@ -335,16 +315,14 @@ function removeFile(index: number) {
 }
 
 // -------------------------------------------------------------
-// TRANSMISSOR (OPTICAL HANDSHAKE)
+// TRANSMISSOR (FOUNTAIN CODES)
 // -------------------------------------------------------------
 
 function setupTransmitterEvents() {
   fileDropzone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     const files = (e.target as HTMLInputElement).files;
-    if (files) {
-      handleFilesSelection(files);
-    }
+    if (files) handleFilesSelection(files);
   });
 
   toggleViewBtn.addEventListener('click', () => {
@@ -360,201 +338,175 @@ function setupTransmitterEvents() {
   });
 
   startTransferBtn.addEventListener('click', () => {
-    if (selectedFiles.length > 0) {
-      rebuildTransmission();
-    }
+    if (selectedFiles.length > 0) rebuildTransmission();
   });
 
   addAnotherFileBtn.addEventListener('click', () => fileInput.click());
+
+  txSpeedSlider.addEventListener('input', (e) => {
+    txSpeedMs = parseInt((e.target as HTMLInputElement).value, 10);
+    txSpeedLabel.textContent = `${txSpeedMs}ms`;
+    if (txFountainLoopId && !isTxPaused) {
+      stopFountainLoop();
+      txFountainLoopId = window.setInterval(transmitNextFountainBlock, txSpeedMs);
+    }
+  });
+
+  txToggleLoopBtn.addEventListener('click', () => {
+    isTxPaused = !isTxPaused;
+    if (isTxPaused) {
+      stopFountainLoop();
+      txToggleLoopBtn.textContent = 'Continuar Transmissão';
+    } else {
+      txFountainLoopId = window.setInterval(transmitNextFountainBlock, txSpeedMs);
+      txToggleLoopBtn.textContent = 'Pausar Transmissão';
+    }
+  });
 }
 
 async function rebuildTransmission() {
   if (selectedFiles.length === 0) return;
 
-  const bytesPerQr = 1800; 
-  allChunks = [];
-
-  for (const file of selectedFiles) {
-    const { pages } = await chunkFileForGrid(file, bytesPerQr, 1);
-    allChunks.push(...pages.flat());
-  }
+  // Usa apenas o primeiro arquivo na fila por enquanto
+  const file = selectedFiles[0];
+  const maxSafePayload = 1500; // Base64 chunk size
   
-  currentChunkIndex = 0;
+  txFountainEncoder = await initializeFountainEncoder(file, maxSafePayload);
+  txFountainGenerator = txFountainEncoder.fountain();
+  txBlocksSent = 0;
+  isTxPaused = false;
+  txSpeedMs = parseInt(txSpeedSlider.value, 10);
+  txSpeedLabel.textContent = `${txSpeedMs}ms`;
 
   showTransmitterDisplayView(true);
 }
 
 function startOpticalTransmitter() {
-  if (selectedFiles.length === 0 || allChunks.length === 0) return;
+  if (!txFountainGenerator) return;
 
-  txFileInfo.textContent = selectedFiles.length > 1 ? `Enviando ${selectedFiles.length} arquivos...` : `Enviando: ${selectedFiles[0].name}`;
-  txProgressFill.style.width = '0%';
-  
-  renderCurrentTxQR();
+  txFileInfo.textContent = `Enviando via Fountain: ${selectedFiles[0].name}`;
+  txProgressFill.style.width = '100%';
+  txToggleLoopBtn.textContent = 'Pausar Transmissão';
 
-  // Configura a câmera do Transmissor para ler os ACKs do Receptor
-  txScanner.onAckDecoded = (ackContent) => {
-    if (currentChunkIndex >= allChunks.length) return;
-
-    const currentChunk = allChunks[currentChunkIndex];
-    const expectedAck = `ACK:${currentChunk.header.fId}:${currentChunk.header.ci}`;
-
-    if (ackContent === expectedAck) {
-      // Recebeu o ACK correto! Pisca o LED virtual e avança imediatamente
-      flashTxSyncLed();
-      audio.playSuccessBeep();
-      
-      currentChunkIndex++;
-      
-      if (currentChunkIndex < allChunks.length) {
-        renderCurrentTxQR();
-      } else {
-        txPageIndicator.textContent = "100%";
-        txProgressFill.style.width = "100%";
-        txFileInfo.textContent = "Transferência Concluída!";
-        txQrContainer.innerHTML = '<div style="color: var(--accent-success); font-size: 3rem;">✓</div>';
-        txScanner.stop();
-      }
-    }
-  };
-
-  txScanner.start(txScannerVideo, 'ACK').catch(err => {
-    console.error('Erro na câmera frontal (Transmissor):', err);
-  });
+  stopFountainLoop();
+  txFountainLoopId = window.setInterval(transmitNextFountainBlock, txSpeedMs);
 }
 
-async function renderCurrentTxQR() {
-  if (currentChunkIndex >= allChunks.length) return;
+function stopFountainLoop() {
+  if (txFountainLoopId) {
+    clearInterval(txFountainLoopId);
+    txFountainLoopId = null;
+  }
+}
 
-  const chunk = allChunks[currentChunkIndex];
-  const total = allChunks.length;
-  const pct = Math.round(((currentChunkIndex) / total) * 100);
+async function transmitNextFountainBlock() {
+  if (!txFountainGenerator || isTxPaused) return;
 
-  txPageIndicator.textContent = `${pct}%`;
-  txProgressFill.style.width = `${pct}%`;
+  const block = txFountainGenerator.next().value;
+  if (!block) return; // Generator exhausted (unlikely for fountain)
 
+  txBlocksSent++;
+  txPageIndicator.textContent = `Fountain Loop (${txBlocksSent} blocos)`;
+
+  const base64Str = encodeBlockToBase64(block);
+  
   txQrContainer.innerHTML = '';
   const canvas = document.createElement('canvas');
-  await renderQRCodeToCanvas(canvas, chunk.qrSegmentData);
+  await renderQRCodeToCanvas(canvas, base64Str);
   canvas.style.maxWidth = '100%';
-  canvas.style.maxHeight = '50vh';
+  canvas.style.maxHeight = '65vh';
   canvas.style.objectFit = 'contain';
-  
   txQrContainer.appendChild(canvas);
 }
 
-function flashTxSyncLed() {
-  txSyncLed.style.background = '#10b981'; // Verde
-  if (txSyncLedTimeout) clearTimeout(txSyncLedTimeout);
-  txSyncLedTimeout = window.setTimeout(() => {
-    txSyncLed.style.background = 'var(--text-muted)';
-  }, 100);
-}
-
-
 // -------------------------------------------------------------
-// RECEPTOR (OPTICAL HANDSHAKE)
+// RECEPTOR (FOUNTAIN CODES)
 // -------------------------------------------------------------
 
 function startOpticalReceiver() {
+  if (!rxFountainDecoder) {
+    rxFountainDecoder = initializeFountainDecoder();
+  }
   rxScanner.onDataDecoded = handleDataDecoded;
-
-  rxScanner.start(rxScannerVideo, 'DATA').catch(err => {
+  rxScanner.start(rxScannerVideo).catch(err => {
     console.error('Erro ao acessar a câmera principal (Receptor):', err);
     showAppDialog('Erro ao acessar a câmera. Conceda as permissões.', 'Permissão Negada');
   });
 }
 
-async function handleDataDecoded(results: ScannedQRInfo[]) {
-  if (!results || results.length === 0) return;
+async function handleDataDecoded(results: any[]) {
+  if (!results || results.length === 0 || !rxFountainDecoder) return;
 
-  const res = results[0]; // Como é 1x1, pega o primeiro
-  const header = res.header;
+  // Em modo Fountain puro, recebemos a string bruta diretamente do worker
+  const base64Str = results[0]; 
+  
+  if (typeof base64Str !== 'string') return;
 
-  if (currentFileIdBeingReceived !== header.fId) {
-    currentFileIdBeingReceived = header.fId;
-    rxFileInfo.textContent = `${header.fn} (${formatBytes(header.fs)})`;
-  }
+  const isNewBlock = feedDecoderWithBase64(rxFountainDecoder, base64Str);
+  
+  if (isNewBlock) {
+    audio.playSuccessBeep();
+    drawReceiverOverlayFeedbacks();
+    
+    const meta = rxFountainDecoder.meta; 
+    const resolvidos = rxFountainDecoder.decodedCount;
+    const blocosNecessarios = meta ? meta.k : '?';
+    const blocosColetados = rxFountainDecoder.encodedBlocks.size;
+    
+    const pct = meta ? Math.round((resolvidos / meta.k) * 100) : 0;
+    rxProgressFill.style.width = `${pct}%`;
+    rxProgressText.textContent = `${pct}% reconstruído`;
+    rxChunksText.textContent = `${blocosColetados} coletados / ~${blocosNecessarios} necessários`;
 
-  // Gera o QR de ACK imediatamente para o Transmissor ver e avançar
-  const ackString = `ACK:${header.fId}:${header.ci}`;
-  await renderQRCodeToCanvas(rxAckCanvas, ackString);
-
-  audio.playSuccessBeep();
-  drawReceiverOverlayFeedbacks();
-
-  // Atualiza Progresso na UI
-  const receivedSet = await getReceivedChunksCount(header.fId);
-  const total = header.tc;
-  const received = receivedSet.size;
-  const pct = Math.round((received / total) * 100);
-
-  rxProgressFill.style.width = `${pct}%`;
-  rxProgressText.textContent = `${pct}% recebido`;
-  rxChunksText.textContent = `${received} / ${total} chunks`;
-
-  // Se completou
-  if (received >= total) {
-    rxScanner.stop(); // Para a câmera para poupar processamento
-    downloadFileBtn.style.display = 'inline-flex';
-    downloadFileBtn.onclick = () => handleDownloadFile(header.fId, header.fn);
+    const decodedBuffer = rxFountainDecoder.getDecoded();
+    if (decodedBuffer) {
+      rxScanner.stop();
+      rxProgressFill.style.width = `100%`;
+      rxProgressText.textContent = `100% reconstruído`;
+      
+      const fileData = extractFileFromDecoder(rxFountainDecoder);
+      if (fileData) {
+        rxFileInfo.textContent = fileData.file.name;
+        downloadFileBtn.style.display = 'inline-flex';
+        downloadFileBtn.onclick = () => {
+          const url = URL.createObjectURL(fileData.file);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileData.file.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+      }
+    }
   }
 }
 
 function drawReceiverOverlayFeedbacks() {
   const ctx = rxScannerOverlay.getContext('2d');
   if (!ctx || !rxScannerVideo) return;
-
   const displayWidth = rxScannerVideo.clientWidth || 480;
   const displayHeight = rxScannerVideo.clientHeight || 640;
-
   if (rxScannerOverlay.width !== displayWidth || rxScannerOverlay.height !== displayHeight) {
     rxScannerOverlay.width = displayWidth;
     rxScannerOverlay.height = displayHeight;
   }
-
   ctx.clearRect(0, 0, rxScannerOverlay.width, rxScannerOverlay.height);
-
-  // Pisca a tela inteira em verde levemente
   ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
   ctx.fillRect(0, 0, displayWidth, displayHeight);
-
   setTimeout(() => {
     ctx.clearRect(0, 0, rxScannerOverlay.width, rxScannerOverlay.height);
   }, 100);
 }
 
-async function handleDownloadFile(fileId: string, fileName: string) {
-  const blob = await assembleFile(fileId);
-  if (!blob) {
-    showAppDialog('Erro ao montar o arquivo final.', 'Erro de Leitura');
-    return;
-  }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-resetRxBtn.addEventListener('click', async () => {
-  if (currentFileIdBeingReceived) {
-    await clearFile(currentFileIdBeingReceived);
-  }
-  currentFileIdBeingReceived = null;
+resetRxBtn.addEventListener('click', () => {
+  rxFountainDecoder = null; // Reseta o decodificador
   rxProgressFill.style.width = '0%';
   rxProgressText.textContent = '0% recebido';
-  rxChunksText.textContent = '0 / 0 chunks';
-  rxFileInfo.textContent = 'Nenhum arquivo lido';
+  rxChunksText.textContent = '0 blocos coletados';
+  rxFileInfo.textContent = 'Aguardando Fonte de Dados...';
   downloadFileBtn.style.display = 'none';
-  
-  // Limpa o canvas de ACK
-  const ctx = rxAckCanvas.getContext('2d');
-  if (ctx) ctx.clearRect(0, 0, rxAckCanvas.width, rxAckCanvas.height);
   
   if (!rxScannerVideo.srcObject) {
     startOpticalReceiver();

@@ -1,7 +1,4 @@
-import { saveChunk } from '../db/storage';
-import type { ScannedQRInfo, WorkerInputMessage, WorkerOutputMessage } from './qrScanner.worker';
-
-export type { ScannedQRInfo };
+import type { WorkerInputMessage, WorkerOutputMessage } from './qrScanner.worker';
 
 export class ScannerEngine {
   private isScanning: boolean = false;
@@ -11,11 +8,9 @@ export class ScannerEngine {
   private offscreenCtx: CanvasRenderingContext2D | null;
   private worker: Worker | null = null;
   private isWorkerProcessingFrame: boolean = false;
-  private mode: 'DATA' | 'ACK' = 'DATA';
   private lastScanTime: number = 0;
 
-  public onDataDecoded?: (results: ScannedQRInfo[]) => void;
-  public onAckDecoded?: (ackContent: string) => void;
+  public onDataDecoded?: (results: string[]) => void;
 
   constructor() {
     this.offscreenCanvas = document.createElement('canvas');
@@ -23,11 +18,9 @@ export class ScannerEngine {
   }
 
   public async start(
-    videoEl: HTMLVideoElement,
-    mode: 'DATA' | 'ACK'
+    videoEl: HTMLVideoElement
   ): Promise<void> {
     this.videoElement = videoEl;
-    this.mode = mode;
     this.isScanning = true;
 
     // Inicializa o Web Worker dedicado
@@ -38,32 +31,14 @@ export class ScannerEngine {
       this.isWorkerProcessingFrame = false;
 
       if (msg.type === 'FRAME_DECODED_DATA' && msg.results.length > 0) {
-        // Receptor processou um bloco de dados!
-        for (const res of msg.results) {
-          await saveChunk({
-            fileId: res.header.fId,
-            chunkIndex: res.header.ci,
-            totalChunks: res.header.tc,
-            fileName: res.header.fn,
-            fileSize: res.header.fs,
-            fileType: res.header.ft,
-            data: res.dataBytes.buffer as ArrayBuffer
-          });
-        }
         if (this.onDataDecoded) {
           this.onDataDecoded(msg.results);
-        }
-      } else if (msg.type === 'FRAME_DECODED_ACK' && msg.ackContent) {
-        // Transmissor recebeu o ACK!
-        if (this.onAckDecoded) {
-          this.onAckDecoded(msg.ackContent);
         }
       }
     };
 
-    // Solicita câmera: receptor usa câmera traseira; transmissor usa câmera frontal por padrão (ou traseira se celular apontado)
     const constraints: MediaStreamConstraints = {
-      video: { facingMode: mode === 'DATA' ? 'environment' : 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } }
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } }
     };
 
     try {
@@ -104,7 +79,6 @@ export class ScannerEngine {
     if (!this.isScanning || !this.videoElement || !this.worker) return;
 
     const now = performance.now();
-    // 60FPS scan rate = ~16ms. Limit to ~30FPS (33ms) processing max.
     if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx && !this.isWorkerProcessingFrame && (now - this.lastScanTime > 30)) {
       this.lastScanTime = now;
 
@@ -115,8 +89,7 @@ export class ScannerEngine {
         videoH = 480;
       }
 
-      // Resize para processamento mais rápido (Handshake é otimizado)
-      const maxDim = this.mode === 'ACK' ? 320 : 640; // ACK é super pequeno e fácil de ler, DATA precisa de mais resolução
+      const maxDim = 800; // Alta resolução para Fountain Codes (até 1500 bytes de carga por frame)
       let targetW = videoW;
       let targetH = videoH;
 
@@ -135,7 +108,7 @@ export class ScannerEngine {
 
       this.isWorkerProcessingFrame = true;
       this.worker.postMessage({
-        type: this.mode === 'DATA' ? 'PROCESS_FRAME_DATA' : 'PROCESS_FRAME_ACK',
+        type: 'PROCESS_FRAME_DATA',
         imageData
       } as WorkerInputMessage);
     }
