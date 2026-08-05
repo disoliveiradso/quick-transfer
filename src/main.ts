@@ -8,7 +8,7 @@ import { getReceivedChunksCount, assembleFile, clearFile } from './db/storage';
 
 interface UserSettings {
   isCustom: boolean;
-  matrixSize: 'auto' | '1x1' | '2x2' | '3x3';
+  matrixSize: '1x1' | '2x2' | '3x3';
   bytesPerQr: number;
   autoTimerSec: number;
 }
@@ -91,7 +91,7 @@ function loadSettingsFromLocalStorage(): UserSettings {
   }
   return {
     isCustom: false,
-    matrixSize: 'auto',
+    matrixSize: '2x2',
     bytesPerQr: 2000,
     autoTimerSec: 0
   };
@@ -139,7 +139,7 @@ function setupSettingsModal() {
   resetAutoSettingsBtn.addEventListener('click', () => {
     userSettings = {
       isCustom: false,
-      matrixSize: 'auto',
+      matrixSize: '2x2',
       bytesPerQr: 2000,
       autoTimerSec: 0
     };
@@ -212,7 +212,7 @@ function setupTransmitterEvents() {
  */
 function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; items: number; bytes: number } {
   // Se o usuário especificou configurações personalizadas e salvas, respeita a escolha
-  if (userSettings.isCustom && userSettings.matrixSize !== 'auto') {
+  if (userSettings.isCustom) {
     let items = 4;
     if (userSettings.matrixSize === '1x1') items = 1;
     if (userSettings.matrixSize === '3x3') items = 9;
@@ -223,16 +223,16 @@ function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | 
     };
   }
 
-  // Lógica Automática:
+  // Lógica Automática (caso não tenha personalizado):
   // < 200 KB => 1x1 (1 QR Code por tela simples e grande)
   // 200 KB a 2 MB => 2x2 (4 QR Codes por tela equilibrado)
   // > 2 MB => 3x3 (9 QR Codes por tela para alta transferência)
   if (fileSize < 200 * 1024) {
-    return { matrixStr: '1x1', items: 1, bytes: userSettings.isCustom ? userSettings.bytesPerQr : 2000 };
+    return { matrixStr: '1x1', items: 1, bytes: 2000 };
   } else if (fileSize < 2 * 1024 * 1024) {
-    return { matrixStr: '2x2', items: 4, bytes: userSettings.isCustom ? userSettings.bytesPerQr : 2200 };
+    return { matrixStr: '2x2', items: 4, bytes: 2200 };
   } else {
-    return { matrixStr: '3x3', items: 9, bytes: userSettings.isCustom ? userSettings.bytesPerQr : 2500 };
+    return { matrixStr: '3x3', items: 9, bytes: 2500 };
   }
 }
 
