@@ -295,8 +295,15 @@ input[type=number]:hover::-webkit-outer-spin-button {
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
+  line-height: 1;
   transition: all 0.2s ease;
+}
+
+.btn svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 .btn:hover:not(:disabled) {

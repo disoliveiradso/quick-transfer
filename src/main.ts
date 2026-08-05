@@ -52,6 +52,7 @@ const scannerInstruction = document.getElementById('scanner-instruction') as HTM
 const manualCodeInput = document.getElementById('manual-code-input') as HTMLInputElement;
 const connectCodeBtn = document.getElementById('connect-code-btn') as HTMLButtonElement;
 const openCameraBtn = document.getElementById('open-camera-btn') as HTMLButtonElement;
+const closeCameraBtn = document.getElementById('close-camera-btn') as HTMLButtonElement;
 const cameraPreviewWrapper = document.getElementById('camera-preview-wrapper') as HTMLElement;
 
 // QR Display (Receptor)
@@ -248,6 +249,19 @@ function init() {
     startCameraScanner();
   });
 
+  closeCameraBtn.addEventListener('click', () => {
+    if (scanner) scanner.stop();
+    cameraPreviewWrapper.style.display = 'none';
+    openCameraBtn.style.display = 'block';
+  });
+
+  // Navegação nativa por botão Voltar do dispositivo / navegador
+  window.addEventListener('popstate', () => {
+    if (!homeSection.classList.contains('active')) {
+      cancelAndGoHome(false);
+    }
+  });
+
   // Botões de cancelamento e desconexão explícita
   disconnectBtn.addEventListener('click', () => {
     if (webrtcManager) {
@@ -257,8 +271,8 @@ function init() {
     cleanupAndGoHome();
   });
   
-  scannerBackBtn.addEventListener('click', cancelAndGoHome);
-  qrBackBtn.addEventListener('click', cancelAndGoHome);
+  scannerBackBtn.addEventListener('click', () => cancelAndGoHome());
+  qrBackBtn.addEventListener('click', () => cancelAndGoHome());
 }
 
 /**
@@ -583,18 +597,22 @@ function updateProgress(bytes: number, total: number) {
   transferBytesText.textContent = `${formatBytes(bytes)} / ${formatBytes(total)}`;
 }
 
-function showView(section: HTMLElement) {
+function showView(section: HTMLElement, pushState: boolean = true) {
   homeSection.classList.remove('active');
   scannerSection.classList.remove('active');
   qrDisplaySection.classList.remove('active');
   transferSection.classList.remove('active');
   section.classList.add('active');
+
+  if (pushState && section !== homeSection) {
+    history.pushState({ viewId: section.id }, '', `#${section.id}`);
+  }
 }
 
 /**
  * Cancelar fluxo e voltar para a Home MANTENDO os arquivos e texto selecionados
  */
-function cancelAndGoHome() {
+function cancelAndGoHome(popHistory: boolean = true) {
   stopSupabaseListening();
 
   if (scanner) {
@@ -614,12 +632,16 @@ function cancelAndGoHome() {
   currentRole = null;
   isConnectionEstablished = false;
 
+  if (popHistory && window.location.hash) {
+    history.back();
+  }
+
   updateFileListUI();
   if (textInput.value.trim().length > 0) {
     sendTextBtn.style.display = 'block';
   }
 
-  showView(homeSection);
+  showView(homeSection, false);
 }
 
 /**

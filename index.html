@@ -97,11 +97,11 @@
         </div>
 
         <!-- 1. Digitar Código Manual (Acima) -->
-        <div class="card" style="padding: 1rem; text-align: center; margin-bottom: 0.75rem;">
+        <div class="card" style="padding: 1rem; text-align: center; margin-bottom: 0.75rem; box-sizing: border-box; width: 100%;">
           <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">Digite o código de conexão exibido no Receptor:</p>
-          <div style="display: flex; gap: 0.5rem;">
-            <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 600; text-transform: uppercase; text-align: center; font-size: 0.95rem; outline: none;" />
-            <button id="connect-code-btn" class="btn" style="background: var(--accent-primary);">Conectar</button>
+          <div style="display: flex; gap: 0.5rem; width: 100%; box-sizing: border-box;">
+            <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" style="flex: 1; min-width: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.75rem; border-radius: 8px; font-weight: 600; text-transform: uppercase; text-align: center; font-size: 0.9rem; outline: none; box-sizing: border-box;" />
+            <button id="connect-code-btn" class="btn" style="flex-shrink: 0; background: var(--accent-primary); padding: 0.65rem 0.9rem; font-size: 0.9rem;">Conectar</button>
           </div>
         </div>
 
@@ -115,18 +115,22 @@
         <div id="camera-trigger-container" style="text-align: center;">
           <button id="open-camera-btn" class="btn btn-secondary full-width-btn" style="padding: 0.75rem; font-size: 0.95rem; margin-bottom: 0.75rem;">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Escanear QR Code com a Câmera
+            <span>Escanear QR Code com a Câmera</span>
           </button>
         </div>
 
-        <div id="camera-preview-wrapper" style="display: none; flex-direction: column; align-items: center; margin-bottom: 0.75rem;">
+        <div id="camera-preview-wrapper" style="display: none; flex-direction: column; align-items: center; margin-bottom: 0.75rem; width: 100%;">
           <div class="card scanner-wrapper-34" style="position: relative; overflow: hidden; margin-bottom: 0.75rem;">
             <video id="scanner-video" playsinline></video>
             <canvas id="scanner-overlay" style="z-index: 10;"></canvas>
           </div>
-          <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+          <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
             Aponte a câmera para o QR Code exibido no Receptor.
           </p>
+          <button id="close-camera-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem; color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <span>Fechar Câmera</span>
+          </button>
         </div>
       </section>
 
