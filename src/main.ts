@@ -10,6 +10,7 @@ let currentFileIndex = 0;
 let isTextTransfer = false;
 let currentRole: 'sender' | 'receiver' | null = null;
 let downloadedFileUrls: string[] = [];
+let isConnectionEstablished = false;
 
 // Elementos DOM
 const homeSection = document.getElementById('home-section') as HTMLElement;
@@ -341,13 +342,15 @@ function getWebRTCEvents() {
   return {
     onConnectionStateChange: (state: RTCPeerConnectionState) => {
       if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-        if (currentRole) {
+        if (isConnectionEstablished) {
+          isConnectionEstablished = false;
           showDialog("Conexão P2P foi interrompida.");
           cleanupAndGoHome();
         }
       }
     },
     onDataChannelOpen: () => {
+      isConnectionEstablished = true;
       if (scanner) scanner.stop();
       showView(transferSection);
       
@@ -471,6 +474,7 @@ function cleanupAndGoHome() {
   
   currentRole = null;
   isTextTransfer = false;
+  isConnectionEstablished = false;
   downloadButtonsContainer.innerHTML = '';
   transferProgressFill.style.width = '0%';
   transferProgressText.textContent = '0%';
