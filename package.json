@@ -1,0 +1,24 @@
+{
+  "name": "quick-transfer",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "deploy": "npm run build && gh-pages -d dist",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "gh-pages": "^6.3.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "@zxing/library": "^0.23.0",
+    "idb": "^8.0.3",
+    "lucide": "^1.28.0",
+    "qrcode": "^1.5.4",
+    "vite-plugin-pwa": "^1.3.0"
+  }
+}
