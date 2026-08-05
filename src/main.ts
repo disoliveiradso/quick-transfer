@@ -37,6 +37,7 @@ let completedPageToastTimeout: number | null = null;
 // ELEMENTOS DOM
 const tabSendBtn = document.getElementById('tab-send-btn') as HTMLButtonElement;
 const tabReceiveBtn = document.getElementById('tab-receive-btn') as HTMLButtonElement;
+const backToSendBtn = document.getElementById('back-to-send-btn') as HTMLButtonElement;
 const transmitterSection = document.getElementById('transmitter-section') as HTMLElement;
 const receiverSection = document.getElementById('receiver-section') as HTMLElement;
 
@@ -50,6 +51,12 @@ const resetAutoSettingsBtn = document.getElementById('reset-auto-settings-btn') 
 const matrixSizeSelect = document.getElementById('matrix-size-select') as HTMLSelectElement;
 const qrDensityInput = document.getElementById('qr-density-input') as HTMLInputElement;
 const autoTimerInput = document.getElementById('auto-timer-input') as HTMLInputElement;
+
+// Modal Pop-up de Dialogs
+const appDialogModal = document.getElementById('app-dialog-modal') as HTMLElement;
+const appDialogTitle = document.getElementById('app-dialog-title') as HTMLElement;
+const appDialogMessage = document.getElementById('app-dialog-message') as HTMLElement;
+const appDialogOkBtn = document.getElementById('app-dialog-ok-btn') as HTMLButtonElement;
 
 // Transmissor Elements
 const fileDropzone = document.getElementById('file-dropzone') as HTMLElement;
@@ -78,8 +85,29 @@ const alertToast = document.getElementById('alert-toast') as HTMLElement;
 function init() {
   setupTabs();
   setupSettingsModal();
+  setupAppDialogModal();
   setupTransmitterEvents();
   syncUIWithSettings();
+}
+
+/**
+ * Exibe pop-ups de aviso/erro customizados na UI da aplicação em substituição ao alert nativo
+ */
+function showAppDialog(message: string, title: string = 'Aviso') {
+  appDialogTitle.textContent = title;
+  appDialogMessage.textContent = message;
+  appDialogModal.style.display = 'flex';
+}
+
+function setupAppDialogModal() {
+  appDialogOkBtn.addEventListener('click', () => {
+    appDialogModal.style.display = 'none';
+  });
+  appDialogModal.addEventListener('click', (e) => {
+    if (e.target === appDialogModal) {
+      appDialogModal.style.display = 'none';
+    }
+  });
 }
 
 function loadSettingsFromLocalStorage(): UserSettings {
@@ -150,10 +178,13 @@ function setupSettingsModal() {
   });
 }
 
-// Alternância de Abas
+// Alternância de Abas e Navegação Dedicada do Receptor
 function setupTabs() {
   tabSendBtn.addEventListener('click', () => switchTab('send'));
   tabReceiveBtn.addEventListener('click', () => switchTab('receive'));
+  if (backToSendBtn) {
+    backToSendBtn.addEventListener('click', () => switchTab('send'));
+  }
 }
 
 function switchTab(tab: 'send' | 'receive') {
@@ -211,7 +242,6 @@ function setupTransmitterEvents() {
  * Ajusta automaticamente o tamanho da matriz e a densidade com base no tamanho do arquivo
  */
 function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; items: number; bytes: number } {
-  // Se o usuário especificou configurações personalizadas e salvas, respeita a escolha
   if (userSettings.isCustom) {
     let items = 4;
     if (userSettings.matrixSize === '1x1') items = 1;
@@ -223,10 +253,6 @@ function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | 
     };
   }
 
-  // Lógica Automática (caso não tenha personalizado):
-  // < 200 KB => 1x1 (1 QR Code por tela simples e grande)
-  // 200 KB a 2 MB => 2x2 (4 QR Codes por tela equilibrado)
-  // > 2 MB => 3x3 (9 QR Codes por tela para alta transferência)
   if (fileSize < 200 * 1024) {
     return { matrixStr: '1x1', items: 1, bytes: 2000 };
   } else if (fileSize < 2 * 1024 * 1024) {
@@ -286,7 +312,7 @@ async function renderCurrentTransmitterPage() {
 
 function startAutoTimer() {
   const interval = (autoTimerSec > 0 ? autoTimerSec : 4) * 1000;
-  autoToggleBtn.textContent = '⏸ Pausar Auto-Passo';
+  autoToggleBtn.textContent = '⏸ Pausar Auto';
   autoToggleBtn.classList.add('btn-secondary');
 
   autoTimerIntervalId = window.setInterval(() => {
@@ -304,7 +330,7 @@ function stopAutoTimer() {
     clearInterval(autoTimerIntervalId);
     autoTimerIntervalId = null;
   }
-  autoToggleBtn.textContent = '▶ Iniciar Auto-Passo';
+  autoToggleBtn.textContent = '▶ Auto-Passo';
   autoToggleBtn.classList.remove('btn-secondary');
 }
 
@@ -313,7 +339,7 @@ function startReceiverScanner() {
   scanner.onQRsDetected = handleQRsDetected;
   scanner.start(scannerVideo).catch(err => {
     console.error('Erro ao acessar a câmera:', err);
-    alert('Erro ao acessar a câmera. Certifique-se de conceder permissão.');
+    showAppDialog('Erro ao acessar a câmera. Certifique-se de conceder permissão no navegador.', 'Permissão Negada');
   });
 }
 
@@ -393,8 +419,8 @@ function drawOverlayFeedbacks(results: ScannedQRInfo[]) {
   const ctx = scannerOverlay.getContext('2d');
   if (!ctx || !scannerVideo) return;
 
-  scannerOverlay.width = scannerVideo.videoWidth || 640;
-  scannerOverlay.height = scannerVideo.videoHeight || 480;
+  scannerOverlay.width = scannerVideo.videoWidth || 480;
+  scannerOverlay.height = scannerVideo.videoHeight || 640;
 
   ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
 
@@ -447,7 +473,7 @@ function showCompletedPageToast() {
 async function handleDownloadFile(fileId: string, fileName: string) {
   const blob = await assembleFile(fileId);
   if (!blob) {
-    alert('Erro ao montar o arquivo final.');
+    showAppDialog('Erro ao montar o arquivo final a partir dos pedaços salvos.', 'Erro de Leitura');
     return;
   }
 
@@ -471,7 +497,7 @@ resetRxBtn.addEventListener('click', async () => {
   rxProgressText.textContent = '0% recebido';
   rxChunksText.textContent = '0 / 0 chunks';
   rxPageStatusGrid.innerHTML = '';
-  rxFileInfo.textContent = 'Nenhum arquivo sendo lido';
+  rxFileInfo.textContent = 'Nenhum arquivo lido';
   downloadFileBtn.style.display = 'none';
 });
 
