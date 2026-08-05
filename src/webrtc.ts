@@ -6,6 +6,7 @@ export type WebRTCEvents = {
   onDataChannelClose: () => void;
   onFileProgress: (bytesReceived: number, totalBytes: number) => void;
   onFileComplete: (file: File) => void;
+  onTextMessage: (text: string) => void;
 };
 
 export class WebRTCManager {
@@ -128,6 +129,15 @@ export class WebRTCManager {
     });
   }
 
+  public sendText(text: string) {
+    if (!this.dc || this.dc.readyState !== 'open') throw new Error('Data channel is not open');
+    const meta = JSON.stringify({
+      isText: true,
+      content: text
+    });
+    this.dc.send(meta);
+  }
+
   public async sendFile(file: File, onProgress: (sent: number, total: number) => void): Promise<void> {
     if (!this.dc || this.dc.readyState !== 'open') throw new Error('Data channel is not open');
 
@@ -184,14 +194,18 @@ export class WebRTCManager {
 
   private handleIncomingData(data: string | ArrayBuffer) {
     if (typeof data === 'string') {
-      // Metadata
       const meta = JSON.parse(data);
-      this.receivingFileName = meta.name;
-      this.expectedBytes = meta.size;
-      this.receivingFileType = meta.type;
-      this.receivedBytes = 0;
-      this.receiveBuffer = [];
-      this.events.onFileProgress(0, this.expectedBytes);
+      if (meta.isText) {
+        this.events.onTextMessage(meta.content);
+      } else {
+        // Metadata for file
+        this.receivingFileName = meta.name;
+        this.expectedBytes = meta.size;
+        this.receivingFileType = meta.type;
+        this.receivedBytes = 0;
+        this.receiveBuffer = [];
+        this.events.onFileProgress(0, this.expectedBytes);
+      }
     } else {
       // Binary chunk
       const u8 = new Uint8Array(data);

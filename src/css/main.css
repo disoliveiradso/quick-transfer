@@ -732,3 +732,10 @@ input[type=number]:hover::-webkit-outer-spin-button {
   color: var(--accent-primary);
 }
 
+  
+/* File List Views */  
+.file-list-view { display: flex; flex-direction: column; gap: 0.5rem; }  
+.file-grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem; }  
+.file-list-item { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; display: flex; align-items: center; position: relative; }  
+.file-grid-view .file-list-item { flex-direction: column; text-align: center; justify-content: center; padding: 1rem 0.5rem; }  
+.truncate-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } 
