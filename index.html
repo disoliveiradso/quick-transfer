@@ -84,53 +84,58 @@
         </button>
       </section>
 
-      <!-- SEÇÃO 2: SCANNER (Compartilhado para ler Oferta ou Resposta) -->
+      <!-- SEÇÃO 2: SCANNER (Transmissor escaneia ou digita o código do Receptor) -->
       <section id="scanner-section" class="view-section">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <button id="scanner-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-              <span id="scanner-back-text">Voltar</span>
-            </button>
-            <button id="scanner-cancel-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: none; align-items: center; gap: 0.4rem; color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
-              <span>Cancelar</span>
+              <span id="scanner-back-text">Cancelar</span>
             </button>
           </div>
-          <span id="scanner-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Escaneando...</span>
+          <span id="scanner-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Conectar ao Receptor</span>
         </div>
 
         <div class="card scanner-wrapper-34" style="position: relative; overflow: hidden; margin-bottom: 0.75rem;">
           <video id="scanner-video" playsinline></video>
           <canvas id="scanner-overlay" style="z-index: 10;"></canvas>
         </div>
-        <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.9rem;">
-          Aponte para o QR Code no outro dispositivo.
+        <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.75rem;">
+          Aponte a câmera para o QR Code exibido no Receptor.
         </p>
+
+        <!-- Conexão por código manual -->
+        <div class="card" style="padding: 1rem; text-align: center;">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; font-weight: 500;">Ou digite o código de conexão exibido no Receptor:</p>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" style="flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 600; text-transform: uppercase; text-align: center; font-size: 0.95rem; outline: none;" />
+            <button id="connect-code-btn" class="btn" style="background: var(--accent-primary);">Conectar</button>
+          </div>
+        </div>
       </section>
 
-      <!-- SEÇÃO 3: QR CODE DISPLAY (Para exibir Oferta ou Resposta) -->
+      <!-- SEÇÃO 3: QR CODE DISPLAY (Receptor exibe o QR Code e Código de Sessão) -->
       <section id="qr-display-section" class="view-section">
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <button id="qr-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-              <span id="qr-back-text">Voltar</span>
-            </button>
-            <button id="qr-cancel-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: none; align-items: center; gap: 0.4rem; color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
-              <span>Cancelar</span>
+              <span id="qr-back-text">Cancelar</span>
             </button>
           </div>
-          <span id="qr-display-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">QR Code</span>
+          <span id="qr-display-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Modo Receptor</span>
         </div>
 
         <div class="card grid-display-wrapper" style="padding: 1rem; text-align: center;">
-          <p id="qr-instruction" style="margin-bottom: 0.75rem; font-weight: 600;">Escaneie este código no outro dispositivo.</p>
+          <p id="qr-instruction" style="margin-bottom: 0.75rem; font-weight: 600;">Escaneie este código no dispositivo transmissor:</p>
           <div id="qr-container" style="display: flex; justify-content: center; background: white; padding: 0.5rem; border-radius: 8px; margin-bottom: 0.75rem;">
             <canvas id="qr-canvas" style="max-width: 100%; height: auto;"></canvas>
           </div>
-          <button id="qr-next-action-btn" class="btn full-width-btn" style="display: none; margin-top: 0.5rem;">
-            Avançar
-          </button>
+          
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 0.5rem;">
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Código de Conexão Manual:</p>
+            <p id="session-code-display" style="font-size: 1.25rem; font-weight: 700; letter-spacing: 2px; color: var(--accent-primary);">Aguardando...</p>
+          </div>
         </div>
       </section>
 

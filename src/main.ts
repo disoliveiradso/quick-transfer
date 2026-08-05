@@ -1,16 +1,28 @@
 import { WebRTCManager } from './webrtc';
 import { ScannerEngine } from './receiver/qrScanner';
 import { renderQRCodeToCanvas } from './transmitter/qrGenerator';
+import { 
+  supabase, 
+  createReceiverSession, 
+  sendOfferToSession, 
+  sendAnswerToSession, 
+  deleteSessionRecord 
+} from './supabase';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
-// Estado global
+// Estado global da aplicação
 let webrtcManager: WebRTCManager | null = null;
 let scanner: ScannerEngine | null = null;
+let activeSupabaseChannel: RealtimeChannel | null = null;
+let pollingInterval: number | null = null;
+
 let selectedFiles: File[] = [];
 let currentFileIndex = 0;
 let isTextTransfer = false;
 let currentRole: 'sender' | 'receiver' | null = null;
-let downloadedFileUrls: string[] = [];
+let currentSessionId: string | null = null;
 let isConnectionEstablished = false;
+let downloadedFileUrls: string[] = [];
 
 // Elementos DOM
 const homeSection = document.getElementById('home-section') as HTMLElement;
@@ -18,7 +30,7 @@ const scannerSection = document.getElementById('scanner-section') as HTMLElement
 const qrDisplaySection = document.getElementById('qr-display-section') as HTMLElement;
 const transferSection = document.getElementById('transfer-section') as HTMLElement;
 
-// Inputs & Previews
+// Inputs & Previews (Home)
 const fileDropzoneCard = document.getElementById('file-dropzone-card') as HTMLElement;
 const fileDropzone = document.getElementById('file-dropzone') as HTMLElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
@@ -33,22 +45,17 @@ const receiveModeBtn = document.getElementById('receive-mode-btn') as HTMLButton
 const textInput = document.getElementById('text-input') as HTMLTextAreaElement;
 const sendTextBtn = document.getElementById('send-text-btn') as HTMLButtonElement;
 
-// Scanner
+// Scanner (Transmissor)
 const scannerVideo = document.getElementById('scanner-video') as HTMLVideoElement;
 const scannerBackBtn = document.getElementById('scanner-back-btn') as HTMLButtonElement;
-const scannerBackText = document.getElementById('scanner-back-text') as HTMLElement;
-const scannerCancelBtn = document.getElementById('scanner-cancel-btn') as HTMLButtonElement;
-const scannerTitle = document.getElementById('scanner-title') as HTMLElement;
 const scannerInstruction = document.getElementById('scanner-instruction') as HTMLElement;
+const manualCodeInput = document.getElementById('manual-code-input') as HTMLInputElement;
+const connectCodeBtn = document.getElementById('connect-code-btn') as HTMLButtonElement;
 
-// QR Display
+// QR Display (Receptor)
 const qrCanvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
 const qrBackBtn = document.getElementById('qr-back-btn') as HTMLButtonElement;
-const qrBackText = document.getElementById('qr-back-text') as HTMLElement;
-const qrCancelBtn = document.getElementById('qr-cancel-btn') as HTMLButtonElement;
-const qrDisplayTitle = document.getElementById('qr-display-title') as HTMLElement;
-const qrInstruction = document.getElementById('qr-instruction') as HTMLElement;
-const qrNextActionBtn = document.getElementById('qr-next-action-btn') as HTMLButtonElement;
+const sessionCodeDisplay = document.getElementById('session-code-display') as HTMLElement;
 
 // Transferência
 const transferHeading = document.getElementById('transfer-heading') as HTMLElement;
@@ -68,7 +75,7 @@ const sendMoreFileInput = document.getElementById('send-more-file-input') as HTM
 const sendMoreFilesBtn = document.getElementById('send-more-files-btn') as HTMLButtonElement;
 const disconnectBtn = document.getElementById('disconnect-btn') as HTMLButtonElement;
 
-// Dialog
+// Modal Pop-up
 const appDialogModal = document.getElementById('app-dialog-modal') as HTMLElement;
 const appDialogTitle = document.getElementById('app-dialog-title') as HTMLElement;
 const appDialogMessage = document.getElementById('app-dialog-message') as HTMLElement;
@@ -80,7 +87,6 @@ function showDialog(message: string, title: string = 'Aviso') {
   appDialogModal.style.display = 'flex';
 }
 
-// Helpers Visuais
 function getFileIcon(type: string): string {
   if (type.startsWith('image/')) return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
   if (type.startsWith('video/')) return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>';
@@ -141,7 +147,6 @@ function updateFileListUI() {
 function init() {
   appDialogOkBtn.onclick = () => appDialogModal.style.display = 'none';
   
-  // File selection
   fileDropzone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     const files = (e.target as HTMLInputElement).files;
@@ -169,7 +174,6 @@ function init() {
     updateFileListUI();
   });
 
-  // Text input detection
   textInput.addEventListener('input', () => {
     if (textInput.value.trim().length > 0) {
       sendTextBtn.style.display = 'block';
@@ -184,27 +188,41 @@ function init() {
     setTimeout(() => copyTextBtn.textContent = "Copiar Texto", 2000);
   });
 
-  // Start Sender Flow (File)
+  // Iniciar fluxo Transmissor (Arquivos)
   startTransferBtn.addEventListener('click', () => {
     if (selectedFiles.length === 0) return;
     isTextTransfer = false;
     startSenderFlow();
   });
 
-  // Start Sender Flow (Text)
+  // Iniciar fluxo Transmissor (Texto)
   sendTextBtn.addEventListener('click', () => {
     if (textInput.value.trim().length === 0) return;
     isTextTransfer = true;
     startSenderFlow();
   });
 
-  // Start Receiver Flow
+  // Iniciar fluxo Receptor (Exibir QR Code e Código de Sessão)
   receiveModeBtn.addEventListener('click', () => {
-    currentRole = 'receiver';
-    startScannerForOffer();
+    startReceiverFlow();
   });
 
-  // Action to send more files over active WebRTC channel
+  // Conexão por código manual no Transmissor
+  connectCodeBtn.addEventListener('click', () => {
+    const code = manualCodeInput.value.trim().toUpperCase();
+    if (!code) {
+      showDialog("Por favor, digite o código do Receptor.");
+      return;
+    }
+    handleSenderConnect(code);
+  });
+
+  manualCodeInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      connectCodeBtn.click();
+    }
+  });
+
   sendMoreFilesBtn.addEventListener('click', () => {
     sendMoreFileInput.click();
   });
@@ -222,120 +240,212 @@ function init() {
     sendMoreFileInput.value = '';
   });
 
-  disconnectBtn.addEventListener('click', cleanupAndGoHome);
-  scannerCancelBtn.addEventListener('click', cleanupAndGoHome);
-  qrCancelBtn.addEventListener('click', cleanupAndGoHome);
-}
-
-async function startSenderFlow() {
-  currentRole = 'sender';
-  showView(qrDisplaySection);
-  qrDisplayTitle.textContent = "Passo 1: Criando Oferta...";
-  qrInstruction.textContent = "Aguarde a geração do QR Code...";
-  qrNextActionBtn.style.display = 'none';
-
-  // Configura botões de navegação no Passo 1 (Remetente)
-  qrBackText.textContent = "Cancelar";
-  qrCancelBtn.style.display = 'none';
-  qrBackBtn.onclick = cleanupAndGoHome;
-
-  webrtcManager = new WebRTCManager(getWebRTCEvents());
-  try {
-    const offerBase64 = await webrtcManager.createOffer();
-    const payload = 'OFR:' + offerBase64;
-    await renderQRCodeToCanvas(qrCanvas, payload);
-    qrDisplayTitle.textContent = "Passo 1: Escaneie no Receptor";
-    qrInstruction.textContent = "Use o botão 'Receber' no outro dispositivo e aponte a câmera para este QR Code.";
-    qrNextActionBtn.textContent = "Avançar (Já escaneei)";
-    qrNextActionBtn.style.display = 'block';
-    
-    qrNextActionBtn.onclick = () => {
-      startScannerForAnswer();
-    };
-  } catch (err) {
-    showDialog("Erro ao criar oferta P2P.", "Erro");
+  // Botões de cancelamento e desconexão explícita
+  disconnectBtn.addEventListener('click', () => {
+    if (webrtcManager) {
+      webrtcManager.sendDisconnectSignal();
+    }
+    showDialog("Conexão encerrada com sucesso.", "Encerrado");
     cleanupAndGoHome();
-  }
+  });
+  
+  scannerBackBtn.addEventListener('click', cleanupAndGoHome);
+  qrBackBtn.addEventListener('click', cleanupAndGoHome);
 }
 
-function startScannerForOffer() {
-  showView(scannerSection);
-  scannerTitle.textContent = "Escaneando Oferta";
-  scannerInstruction.textContent = "Aponte a câmera para o QR Code de Oferta gerado pelo Transmissor.";
-  
-  // Configura botões de navegação no Passo 1 (Receptor)
-  scannerBackText.textContent = "Cancelar";
-  scannerCancelBtn.style.display = 'none';
-  scannerBackBtn.onclick = cleanupAndGoHome;
+/**
+ * ----------------------------------------------------
+ * FLUXO DO RECEPTOR (Ex: Smart TV ou PC sem câmera)
+ * ----------------------------------------------------
+ * 1. Gera ID de sessão único e insere na tabela "sessoes" do Supabase.
+ * 2. Exibe o QR Code na tela com o ID de sessão e a string do código.
+ * 3. Escuta a tabela do Supabase em tempo real por uma "offer" do Transmissor.
+ * 4. Ao receber a offer: cria a answer, atualiza o Supabase e DELETA o registro imediatamente!
+ */
+async function startReceiverFlow() {
+  cleanupAndGoHome();
+  currentRole = 'receiver';
+  showView(qrDisplaySection);
 
-  if (!scanner) scanner = new ScannerEngine();
-  scanner.onDataDecoded = async (results) => {
-    const data = results[0];
-    if (data.startsWith('OFR:')) {
-      scanner!.stop();
-      audioBeep();
-      await handleOfferScanned(data.substring(4));
+  // Gerar ID de sessão único fácil de ler
+  const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+  currentSessionId = `QT-${randomPart}`;
+
+  sessionCodeDisplay.textContent = currentSessionId;
+  await renderQRCodeToCanvas(qrCanvas, currentSessionId);
+
+  try {
+    await createReceiverSession(currentSessionId);
+  } catch (err) {
+    showDialog("Erro ao criar sessão de sinalização no Supabase.");
+    cleanupAndGoHome();
+    return;
+  }
+
+  // Escutar evento Realtime do Supabase no canal da sessão
+  listenForOfferOnSupabase(currentSessionId);
+}
+
+function listenForOfferOnSupabase(sessionId: string) {
+  let hasHandledOffer = false;
+
+  const handleOfferPayload = async (offerSdpStr: string) => {
+    if (hasHandledOffer) return;
+    hasHandledOffer = true;
+
+    // Parar escutas do Supabase
+    stopSupabaseListening();
+
+    webrtcManager = new WebRTCManager(getWebRTCEvents());
+    try {
+      // Gerar Resposta SDP (answer)
+      const answerSdp = await webrtcManager.acceptOfferAndCreateAnswer(offerSdpStr);
+
+      // Enviar a answer de volta para o Supabase
+      await sendAnswerToSession(sessionId, answerSdp);
+
+      // AUTO-DESTRUIÇÃO IMEDIATA DO REGISTRO NO SUPABASE
+      await deleteSessionRecord(sessionId);
+    } catch (err) {
+      showDialog("Falha ao processar oferta WebRTC.");
+      cleanupAndGoHome();
     }
   };
-  scanner.start(scannerVideo).catch(() => showDialog("Erro na câmera"));
-}
 
-async function handleOfferScanned(offerStr: string) {
-  showView(qrDisplaySection);
-  qrDisplayTitle.textContent = "Passo 2: Criando Resposta...";
-  qrInstruction.textContent = "Aguarde a geração do QR Code de resposta...";
-  qrNextActionBtn.style.display = 'none';
-
-  // Configura botões no Passo 2 (Receptor - tem Voltar e Cancelar)
-  qrBackText.textContent = "Voltar";
-  qrCancelBtn.style.display = 'inline-flex';
-  qrBackBtn.onclick = () => {
-    startScannerForOffer();
-  };
-
-  webrtcManager = new WebRTCManager(getWebRTCEvents());
-  try {
-    const answerBase64 = await webrtcManager.acceptOfferAndCreateAnswer(offerStr);
-    const payload = 'ANS:' + answerBase64;
-    await renderQRCodeToCanvas(qrCanvas, payload);
-    
-    qrDisplayTitle.textContent = "Passo 2: Escaneie no Transmissor";
-    qrInstruction.textContent = "No Transmissor, clique em Avançar e aponte a câmera para este QR Code.";
-  } catch (err) {
-    showDialog("Falha ao aceitar oferta.", "Erro");
-    cleanupAndGoHome();
-  }
-}
-
-function startScannerForAnswer() {
-  showView(scannerSection);
-  scannerTitle.textContent = "Escaneando Resposta";
-  scannerInstruction.textContent = "Aponte a câmera para o QR Code gerado pelo Receptor.";
-  
-  // Configura botões no Passo 2 (Remetente - tem Voltar e Cancelar)
-  scannerBackText.textContent = "Voltar";
-  scannerCancelBtn.style.display = 'inline-flex';
-  scannerBackBtn.onclick = () => {
-    if (scanner) scanner.stop();
-    showView(qrDisplaySection);
-  };
-
-  if (!scanner) scanner = new ScannerEngine();
-  scanner.onDataDecoded = async (results) => {
-    const data = results[0];
-    if (data.startsWith('ANS:')) {
-      scanner!.stop();
-      audioBeep();
-      try {
-        await webrtcManager!.acceptAnswer(data.substring(4));
-        scannerInstruction.textContent = "Conectando P2P...";
-      } catch (e) {
-        showDialog("Falha ao processar resposta", "Erro");
-        cleanupAndGoHome();
+  // Canal Supabase Realtime
+  activeSupabaseChannel = supabase
+    .channel(`realtime-session-${sessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'sessoes',
+        filter: `id=eq.${sessionId}`
+      },
+      (payload) => {
+        const row = payload.new;
+        if (row && row.offer) {
+          handleOfferPayload(row.offer);
+        }
       }
+    )
+    .subscribe();
+
+  // Polling de fallback (caso WebSockets do Supabase Realtime sejam bloqueados pela rede)
+  pollingInterval = window.setInterval(async () => {
+    if (hasHandledOffer) return;
+    try {
+      const { data } = await supabase.from('sessoes').select('offer').eq('id', sessionId).single();
+      if (data && data.offer) {
+        handleOfferPayload(data.offer);
+      }
+    } catch (e) {}
+  }, 1500);
+}
+
+/**
+ * ----------------------------------------------------
+ * FLUXO DO TRANSMISSOR (Ex: Celular com câmera)
+ * ----------------------------------------------------
+ * 1. Abre o scanner de câmera (ou input de código manual).
+ * 2. Ao escanear/digitar o ID do Receptor: cria a Oferta SDP (offer) e envia para o Supabase.
+ * 3. Escuta a tabela do Supabase até receber a "answer".
+ * 4. Fecha o canal do Supabase e estabelece o túnel P2P direto!
+ */
+function startSenderFlow() {
+  currentRole = 'sender';
+  showView(scannerSection);
+  scannerInstruction.textContent = "Aponte a câmera para o QR Code exibido no Receptor.";
+  manualCodeInput.value = '';
+
+  if (!scanner) scanner = new ScannerEngine();
+  scanner.onDataDecoded = (results) => {
+    const data = results[0];
+    if (data && data.startsWith('QT-')) {
+      scanner!.stop();
+      audioBeep();
+      handleSenderConnect(data.trim());
     }
   };
-  scanner.start(scannerVideo).catch(() => showDialog("Erro na câmera"));
+  scanner.start(scannerVideo).catch(() => {
+    scannerInstruction.textContent = "Câmera indisponível. Utilize o código de conexão abaixo:";
+  });
+}
+
+async function handleSenderConnect(sessionId: string) {
+  if (scanner) scanner.stop();
+  currentSessionId = sessionId;
+
+  scannerInstruction.textContent = "Conectando ao Receptor via WebRTC...";
+  webrtcManager = new WebRTCManager(getWebRTCEvents());
+
+  try {
+    const offerSdp = await webrtcManager.createOffer();
+    await sendOfferToSession(sessionId, offerSdp);
+    listenForAnswerOnSupabase(sessionId);
+  } catch (err) {
+    showDialog("Sessão não encontrada ou indisponível.");
+    cleanupAndGoHome();
+  }
+}
+
+function listenForAnswerOnSupabase(sessionId: string) {
+  let hasHandledAnswer = false;
+
+  const handleAnswerPayload = async (answerSdpStr: string) => {
+    if (hasHandledAnswer) return;
+    hasHandledAnswer = true;
+
+    stopSupabaseListening();
+
+    try {
+      await webrtcManager!.acceptAnswer(answerSdpStr);
+    } catch (err) {
+      showDialog("Falha ao aceitar resposta P2P.");
+      cleanupAndGoHome();
+    }
+  };
+
+  activeSupabaseChannel = supabase
+    .channel(`realtime-sender-${sessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'sessoes',
+        filter: `id=eq.${sessionId}`
+      },
+      (payload) => {
+        const row = payload.new;
+        if (row && row.answer) {
+          handleAnswerPayload(row.answer);
+        }
+      }
+    )
+    .subscribe();
+
+  pollingInterval = window.setInterval(async () => {
+    if (hasHandledAnswer) return;
+    try {
+      const { data } = await supabase.from('sessoes').select('answer').eq('id', sessionId).single();
+      if (data && data.answer) {
+        handleAnswerPayload(data.answer);
+      }
+    } catch (e) {}
+  }, 1500);
+}
+
+function stopSupabaseListening() {
+  if (activeSupabaseChannel) {
+    supabase.removeChannel(activeSupabaseChannel);
+    activeSupabaseChannel = null;
+  }
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
 }
 
 function getWebRTCEvents() {
@@ -344,13 +454,14 @@ function getWebRTCEvents() {
       if (state === 'failed' || state === 'disconnected' || state === 'closed') {
         if (isConnectionEstablished) {
           isConnectionEstablished = false;
-          showDialog("Conexão P2P foi interrompida.");
+          showDialog("A conexão P2P foi perdida.", "Desconectado");
           cleanupAndGoHome();
         }
       }
     },
     onDataChannelOpen: () => {
       isConnectionEstablished = true;
+      stopSupabaseListening();
       if (scanner) scanner.stop();
       showView(transferSection);
       
@@ -377,9 +488,16 @@ function getWebRTCEvents() {
       }
     },
     onDataChannelClose: () => {
-      if (currentRole === 'sender') {
-        // Silent close
+      if (isConnectionEstablished) {
+        isConnectionEstablished = false;
+        showDialog("O canal de transferência foi encerrado.", "Conexão Encerrada");
+        cleanupAndGoHome();
       }
+    },
+    onRemoteDisconnect: () => {
+      isConnectionEstablished = false;
+      showDialog("O outro dispositivo encerrou a conexão.", "Conexão Encerrada");
+      cleanupAndGoHome();
     },
     onFileProgress: (bytesReceived: number, totalBytes: number) => {
       if (currentRole === 'receiver') {
@@ -439,7 +557,7 @@ async function sendNextFile() {
   try {
     await webrtcManager.sendFile(file, updateProgress);
     currentFileIndex++;
-    sendNextFile(); // Start next file
+    sendNextFile();
   } catch (err) {
     showDialog("Erro ao enviar o arquivo: " + file.name);
     cleanupAndGoHome();
@@ -461,20 +579,35 @@ function showView(section: HTMLElement) {
   section.classList.add('active');
 }
 
+/**
+ * KILL SWITCH E HIGIENE DE DADOS PROFUNDA
+ * Limpa todos os recursos em memória RAM, fecha WebRTC, revoga URLs e reseta estado.
+ */
 function cleanupAndGoHome() {
+  stopSupabaseListening();
+
   if (scanner) {
-    scanner.stop();
+    try { scanner.stop(); } catch (e) {}
   }
+
   if (webrtcManager) {
-    webrtcManager.destroy();
+    try { webrtcManager.destroy(); } catch (e) {}
     webrtcManager = null;
   }
+
+  // Deletar registro de sessão pendente no Supabase se houver
+  if (currentSessionId) {
+    deleteSessionRecord(currentSessionId);
+    currentSessionId = null;
+  }
+
   downloadedFileUrls.forEach(url => URL.revokeObjectURL(url));
   downloadedFileUrls = [];
   
   currentRole = null;
   isTextTransfer = false;
   isConnectionEstablished = false;
+
   downloadButtonsContainer.innerHTML = '';
   transferProgressFill.style.width = '0%';
   transferProgressText.textContent = '0%';
