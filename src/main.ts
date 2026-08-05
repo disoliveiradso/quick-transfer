@@ -542,11 +542,41 @@ function resetPhotoStateToLiveCamera() {
 
 // LÓGICA DO RECEPTOR
 function startReceiverScanner() {
-  scanner.onQRsDetected = handleQRsDetected;
+  scanner.onMultiQrAutoTrigger = () => {
+    // Quando a câmera detectar múltiplos QR codes e a imagem estiver focada/nítida, dispara a foto automaticamente!
+    if (!isPhotoCapturedState) {
+      triggerAutoSnapshot();
+    }
+  };
+
+  scanner.onSnapshotDecoded = handleQRsDetected;
+
   scanner.start(scannerVideo).catch(err => {
     console.error('Erro ao acessar a câmera:', err);
     showAppDialog('Erro ao acessar a câmera. Certifique-se de conceder permissão no navegador.', 'Permissão Negada');
   });
+}
+
+function triggerAutoSnapshot() {
+  capturedImageData = scanner.captureSnapshot(capturedSnapshotCanvas);
+  if (capturedImageData) {
+    isPhotoCapturedState = true;
+
+    // Oculta vídeo da câmera e exibe a foto congelada nítida
+    scannerVideo.style.display = 'none';
+    capturedSnapshotCanvas.style.display = 'block';
+
+    // Ativa animação laser de varredura (Scanline)
+    scanlineAnim.style.display = 'block';
+
+    // Alterna botões
+    capturePhotoBtn.style.display = 'none';
+    retakePhotoBtn.style.display = 'inline-flex';
+
+    // Executa a decodificação da foto congelada
+    runPhotoScanIteration();
+    scanlineLoopInterval = window.setInterval(runPhotoScanIteration, 1000);
+  }
 }
 
 function handleQRsDetected(results: ScannedQRInfo[]) {

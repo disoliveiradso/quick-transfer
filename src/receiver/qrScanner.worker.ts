@@ -1,4 +1,3 @@
-import { readBarcodesFromImageData } from 'zxing-wasm/reader';
 import { unpackChunkString } from '../transmitter/chunker';
 import type { FileChunkHeader } from '../transmitter/chunker';
 
@@ -15,71 +14,124 @@ export interface ScannedQRInfo {
 }
 
 export type WorkerInputMessage = {
-  type: 'SCAN_FRAME';
+  type: 'DETECT_MULTI';
   imageData: ImageData;
-  maxSymbols: number;
+} | {
+  type: 'DECODE_SNAPSHOT';
+  imageData: ImageData;
 };
 
 export type WorkerOutputMessage = {
-  type: 'QRS_DETECTED';
+  type: 'MULTI_QR_DETECTED_AUTO_TRIGGER';
+  count: number;
+} | {
+  type: 'SNAPSHOT_DECODED';
   results: ScannedQRInfo[];
 } | {
-  type: 'DONE_SCANNING';
+  type: 'IDLE_DONE';
 };
+
+/**
+ * Calcula a variância do Laplaciano para medir o nível de nitidez (foco) da imagem.
+ * Imagens desfocadas/borradas possuem variância baixa (< 80).
+ * Imagens nítidas/focadas possuem variância alta (> 150).
+ */
+function computeBlurSharpnessScore(imageData: ImageData): number {
+  const data = imageData.data;
+  const width = imageData.width;
+  const height = imageData.height;
+
+  // Converte para escala de cinza em sub-amostragem (stride 2) para ultra performance
+  const grayWidth = Math.floor(width / 2);
+  const grayHeight = Math.floor(height / 2);
+  const gray = new Float32Array(grayWidth * grayHeight);
+
+  for (let y = 0; y < grayHeight; y++) {
+    for (let x = 0; x < grayWidth; x++) {
+      const srcIdx = ((y * 2) * width + (x * 2)) * 4;
+      gray[y * grayWidth + x] = 0.299 * data[srcIdx] + 0.587 * data[srcIdx + 1] + 0.114 * data[srcIdx + 2];
+    }
+  }
+
+  // Kernel Laplaciano [0, 1, 0; 1, -4, 1; 0, 1, 0]
+  let sum = 0;
+  let sumSq = 0;
+  let count = 0;
+
+  for (let y = 1; y < grayHeight - 1; y++) {
+    for (let x = 1; x < grayWidth - 1; x++) {
+      const idx = y * grayWidth + x;
+      const lap = gray[idx - grayWidth] + gray[idx + grayWidth] + gray[idx - 1] + gray[idx + 1] - 4 * gray[idx];
+      sum += lap;
+      sumSq += lap * lap;
+      count++;
+    }
+  }
+
+  if (count === 0) return 0;
+  const mean = sum / count;
+  const variance = (sumSq / count) - (mean * mean);
+  return variance;
+}
 
 self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
   const msg = e.data;
 
-  if (msg.type === 'SCAN_FRAME') {
+  // MODO 1: Detecção Rápida Light em tempo real para disparo automático de captura quando focado
+  if (msg.type === 'DETECT_MULTI') {
     try {
-      let barcodes: Array<{ text?: string; bytes?: Uint8Array; position: ScannedQRInfo['position'] }> = [];
+      let qrCount = 0;
 
-      // 1. Tenta API Nativa BarcodeDetector se disponível
+      // 1. Tenta API Nativa BarcodeDetector ultrarrápida
       if ('BarcodeDetector' in self) {
         try {
-          const detector = new (self as unknown as { BarcodeDetector: new (opts: { formats: string[] }) => { detect: (data: ImageData) => Promise<Array<{ rawValue: string; cornerPoints: Array<{ x: number; y: number }> }>> } })
+          const detector = new (self as unknown as { BarcodeDetector: new (opts: { formats: string[] }) => { detect: (data: ImageData) => Promise<Array<{ rawValue: string }>> } })
             .BarcodeDetector({ formats: ['qr_code'] });
-          
           const nativeResults = await detector.detect(msg.imageData);
-          if (nativeResults && nativeResults.length > 0) {
-            barcodes = nativeResults.map(r => ({
-              text: r.rawValue,
-              position: {
-                topLeft: r.cornerPoints[0] || { x: 0, y: 0 },
-                topRight: r.cornerPoints[1] || { x: 0, y: 0 },
-                bottomRight: r.cornerPoints[2] || { x: 0, y: 0 },
-                bottomLeft: r.cornerPoints[3] || { x: 0, y: 0 }
-              }
-            }));
+          if (nativeResults) {
+            qrCount = nativeResults.length;
           }
         } catch (_) {}
       }
 
-      // 2. Fallback / Complemento ZXing-WASM
-      if (barcodes.length === 0) {
-        const wasmResults = await readBarcodesFromImageData(msg.imageData, {
-          formats: ['QRCode'],
-          tryHarder: true,
-          maxNumberOfSymbols: msg.maxSymbols || 9
-        });
-        if (wasmResults) {
-          barcodes = wasmResults.map(b => ({
-            text: b.text,
-            bytes: b.bytes,
-            position: b.position
-          }));
+      // Se detectou mais de 1 QR Code na visão ao vivo
+      if (qrCount > 1) {
+        // Verifica a nitidez/foco da imagem usando variância Laplaciana
+        const sharpness = computeBlurSharpnessScore(msg.imageData);
+
+        // Se a nitidez estiver boa (> 100 indica imagem limpa sem borrão de movimento)
+        if (sharpness > 100) {
+          self.postMessage({
+            type: 'MULTI_QR_DETECTED_AUTO_TRIGGER',
+            count: qrCount
+          } as WorkerOutputMessage);
+          return;
         }
       }
+    } catch (_) {}
 
-      if (barcodes && barcodes.length > 0) {
+    self.postMessage({ type: 'IDLE_DONE' } as WorkerOutputMessage);
+    return;
+  }
+
+  // MODO 2: Decodificação Profunda da Foto Estática Capturada (Roda APENAS na foto congelada sem pesar no vídeo ao vivo!)
+  if (msg.type === 'DECODE_SNAPSHOT') {
+    try {
+      const { readBarcodesFromImageData } = await import('zxing-wasm/reader');
+      const wasmResults = await readBarcodesFromImageData(msg.imageData, {
+        formats: ['QRCode'],
+        tryHarder: true,
+        maxNumberOfSymbols: 9
+      });
+
+      if (wasmResults && wasmResults.length > 0) {
         const detectedList: ScannedQRInfo[] = [];
 
-        for (const barcode of barcodes) {
+        for (const barcode of wasmResults) {
           let textData = barcode.text || '';
           if (!textData && barcode.bytes && barcode.bytes.length > 0) {
             try {
-              const textDecoder = new TextDecoder('utf-8');
-              textData = textDecoder.decode(barcode.bytes);
+              textData = new TextDecoder('utf-8').decode(barcode.bytes);
             } catch (_) {}
           }
 
@@ -98,16 +150,14 @@ self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
 
         if (detectedList.length > 0) {
           self.postMessage({
-            type: 'QRS_DETECTED',
+            type: 'SNAPSHOT_DECODED',
             results: detectedList
           } as WorkerOutputMessage);
           return;
         }
       }
-    } catch (err) {
-      // Catch e continua
-    }
+    } catch (err) {}
 
-    self.postMessage({ type: 'DONE_SCANNING' } as WorkerOutputMessage);
+    self.postMessage({ type: 'IDLE_DONE' } as WorkerOutputMessage);
   }
 };

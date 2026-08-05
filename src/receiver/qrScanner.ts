@@ -11,8 +11,10 @@ export class ScannerEngine {
   private offscreenCtx: CanvasRenderingContext2D | null;
   private worker: Worker | null = null;
   private isWorkerProcessingFrame: boolean = false;
+  private lastScanTime: number = 0;
 
-  public onQRsDetected?: (results: ScannedQRInfo[]) => void;
+  public onMultiQrAutoTrigger?: () => void;
+  public onSnapshotDecoded?: (results: ScannedQRInfo[]) => void;
 
   constructor() {
     this.offscreenCanvas = document.createElement('canvas');
@@ -48,9 +50,8 @@ export class ScannerEngine {
     if (this.worker) {
       this.isWorkerProcessingFrame = true;
       this.worker.postMessage({
-        type: 'SCAN_FRAME',
-        imageData,
-        maxSymbols: 9
+        type: 'DECODE_SNAPSHOT',
+        imageData
       } as WorkerInputMessage);
     }
   }
@@ -69,7 +70,11 @@ export class ScannerEngine {
       const msg = e.data;
       this.isWorkerProcessingFrame = false;
 
-      if (msg.type === 'QRS_DETECTED' && msg.results.length > 0) {
+      if (msg.type === 'MULTI_QR_DETECTED_AUTO_TRIGGER') {
+        if (this.onMultiQrAutoTrigger) {
+          this.onMultiQrAutoTrigger();
+        }
+      } else if (msg.type === 'SNAPSHOT_DECODED' && msg.results.length > 0) {
         for (const res of msg.results) {
           // Salva no IndexedDB
           await saveChunk({
@@ -83,8 +88,8 @@ export class ScannerEngine {
           });
         }
 
-        if (this.onQRsDetected) {
-          this.onQRsDetected(msg.results);
+        if (this.onSnapshotDecoded) {
+          this.onSnapshotDecoded(msg.results);
         }
       }
     };
@@ -101,7 +106,6 @@ export class ScannerEngine {
       this.videoElement.srcObject = stream;
       await this.videoElement.play();
     } catch (_) {
-      // Fallback para câmera padrão sem resolução ideal caso falhe no dispositivo
       const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       this.videoElement.srcObject = fallbackStream;
       await this.videoElement.play();
@@ -127,23 +131,21 @@ export class ScannerEngine {
     }
   }
 
-  private lastScanTime: number = 0;
-
   private scanLoop = () => {
     if (!this.isScanning || !this.videoElement || !this.worker) return;
 
     const now = performance.now();
 
     if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx) {
-      // Throttling inteligente: Limita o envio de frames para processamento no Worker a cada ~180ms (aprox 5 FPS de varredura), liberando a UI para rodar cravada a 60 FPS!
-      if (!this.isWorkerProcessingFrame && now - this.lastScanTime >= 180) {
+      // Detecção ultraleve a cada 300ms exclusivamente para disparar o auto-snapshot quando focado
+      if (!this.isWorkerProcessingFrame && now - this.lastScanTime >= 300) {
         this.lastScanTime = now;
 
         const videoW = this.videoElement.videoWidth || 640;
         const videoH = this.videoElement.videoHeight || 480;
 
-        // Otimização de Resolução Offscreen (max 960px de largura mantendo a proporção) para leitura veloz
-        const maxDim = 960;
+        // Subamostragem super leve (max 480px) para zero impacto de performance no vídeo ao vivo
+        const maxDim = 480;
         let targetW = videoW;
         let targetH = videoH;
 
@@ -162,9 +164,8 @@ export class ScannerEngine {
 
         this.isWorkerProcessingFrame = true;
         this.worker.postMessage({
-          type: 'SCAN_FRAME',
-          imageData,
-          maxSymbols: 9
+          type: 'DETECT_MULTI',
+          imageData
         } as WorkerInputMessage);
       }
     }
