@@ -11,56 +11,23 @@ export class ScannerEngine {
   private offscreenCtx: CanvasRenderingContext2D | null;
   private worker: Worker | null = null;
   private isWorkerProcessingFrame: boolean = false;
+  private mode: 'DATA' | 'ACK' = 'DATA';
   private lastScanTime: number = 0;
 
-  public onMultiQrAutoTrigger?: () => void;
-  public onSnapshotDecoded?: (results: ScannedQRInfo[]) => void;
+  public onDataDecoded?: (results: ScannedQRInfo[]) => void;
+  public onAckDecoded?: (ackContent: string) => void;
 
   constructor() {
     this.offscreenCanvas = document.createElement('canvas');
     this.offscreenCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: true });
   }
 
-  public captureSnapshot(snapshotCanvas: HTMLCanvasElement): ImageData | null {
-    if (!this.videoElement || this.videoElement.readyState < this.videoElement.HAVE_CURRENT_DATA || !this.offscreenCtx) {
-      return null;
-    }
-
-    const width = this.videoElement.videoWidth || 640;
-    const height = this.videoElement.videoHeight || 480;
-
-    snapshotCanvas.width = width;
-    snapshotCanvas.height = height;
-
-    const snapCtx = snapshotCanvas.getContext('2d');
-    if (snapCtx) {
-      snapCtx.drawImage(this.videoElement, 0, 0, width, height);
-    }
-
-    if (this.offscreenCanvas.width !== width || this.offscreenCanvas.height !== height) {
-      this.offscreenCanvas.width = width;
-      this.offscreenCanvas.height = height;
-    }
-
-    this.offscreenCtx.drawImage(this.videoElement, 0, 0, width, height);
-    return this.offscreenCtx.getImageData(0, 0, width, height);
-  }
-
-  public processSnapshotImageData(imageData: ImageData) {
-    if (this.worker) {
-      this.isWorkerProcessingFrame = true;
-      this.worker.postMessage({
-        type: 'DECODE_SNAPSHOT',
-        imageData
-      } as WorkerInputMessage);
-    }
-  }
-
   public async start(
     videoEl: HTMLVideoElement,
-    deviceId?: string
+    mode: 'DATA' | 'ACK'
   ): Promise<void> {
     this.videoElement = videoEl;
+    this.mode = mode;
     this.isScanning = true;
 
     // Inicializa o Web Worker dedicado
@@ -70,13 +37,9 @@ export class ScannerEngine {
       const msg = e.data;
       this.isWorkerProcessingFrame = false;
 
-      if (msg.type === 'MULTI_QR_DETECTED_AUTO_TRIGGER') {
-        if (this.onMultiQrAutoTrigger) {
-          this.onMultiQrAutoTrigger();
-        }
-      } else if (msg.type === 'SNAPSHOT_DECODED' && msg.results.length > 0) {
+      if (msg.type === 'FRAME_DECODED_DATA' && msg.results.length > 0) {
+        // Receptor processou um bloco de dados!
         for (const res of msg.results) {
-          // Salva no IndexedDB
           await saveChunk({
             fileId: res.header.fId,
             chunkIndex: res.header.ci,
@@ -87,18 +50,20 @@ export class ScannerEngine {
             data: res.dataBytes.buffer as ArrayBuffer
           });
         }
-
-        if (this.onSnapshotDecoded) {
-          this.onSnapshotDecoded(msg.results);
+        if (this.onDataDecoded) {
+          this.onDataDecoded(msg.results);
+        }
+      } else if (msg.type === 'FRAME_DECODED_ACK' && msg.ackContent) {
+        // Transmissor recebeu o ACK!
+        if (this.onAckDecoded) {
+          this.onAckDecoded(msg.ackContent);
         }
       }
     };
 
-    // Solicita câmera
+    // Solicita câmera: receptor usa câmera traseira; transmissor usa câmera frontal por padrão (ou traseira se celular apontado)
     const constraints: MediaStreamConstraints = {
-      video: deviceId
-        ? { deviceId: { exact: deviceId } }
-        : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+      video: { facingMode: mode === 'DATA' ? 'environment' : 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } }
     };
 
     try {
@@ -106,9 +71,13 @@ export class ScannerEngine {
       this.videoElement.srcObject = stream;
       await this.videoElement.play();
     } catch (_) {
-      const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      this.videoElement.srcObject = fallbackStream;
-      await this.videoElement.play();
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        this.videoElement.srcObject = fallbackStream;
+        await this.videoElement.play();
+      } catch (e) {
+        console.error("Camera access failed", e);
+      }
     }
 
     this.scanLoop();
@@ -135,39 +104,40 @@ export class ScannerEngine {
     if (!this.isScanning || !this.videoElement || !this.worker) return;
 
     const now = performance.now();
+    // 60FPS scan rate = ~16ms. Limit to ~30FPS (33ms) processing max.
+    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx && !this.isWorkerProcessingFrame && (now - this.lastScanTime > 30)) {
+      this.lastScanTime = now;
 
-    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx) {
-      // Detecção ultraleve a cada 300ms exclusivamente para disparar o auto-snapshot quando focado
-      if (!this.isWorkerProcessingFrame && now - this.lastScanTime >= 300) {
-        this.lastScanTime = now;
-
-        const videoW = this.videoElement.videoWidth || 640;
-        const videoH = this.videoElement.videoHeight || 480;
-
-        // Subamostragem super leve (max 480px) para zero impacto de performance no vídeo ao vivo
-        const maxDim = 480;
-        let targetW = videoW;
-        let targetH = videoH;
-
-        if (videoW > maxDim) {
-          targetW = maxDim;
-          targetH = Math.round((videoH * maxDim) / videoW);
-        }
-
-        if (this.offscreenCanvas.width !== targetW || this.offscreenCanvas.height !== targetH) {
-          this.offscreenCanvas.width = targetW;
-          this.offscreenCanvas.height = targetH;
-        }
-
-        this.offscreenCtx.drawImage(this.videoElement, 0, 0, targetW, targetH);
-        const imageData = this.offscreenCtx.getImageData(0, 0, targetW, targetH);
-
-        this.isWorkerProcessingFrame = true;
-        this.worker.postMessage({
-          type: 'DETECT_MULTI',
-          imageData
-        } as WorkerInputMessage);
+      let videoW = this.videoElement.videoWidth;
+      let videoH = this.videoElement.videoHeight;
+      if (!videoW || !videoH) {
+        videoW = 640;
+        videoH = 480;
       }
+
+      // Resize para processamento mais rápido (Handshake é otimizado)
+      const maxDim = this.mode === 'ACK' ? 320 : 640; // ACK é super pequeno e fácil de ler, DATA precisa de mais resolução
+      let targetW = videoW;
+      let targetH = videoH;
+
+      if (videoW > maxDim) {
+        targetW = maxDim;
+        targetH = Math.round((videoH * maxDim) / videoW);
+      }
+
+      if (this.offscreenCanvas.width !== targetW || this.offscreenCanvas.height !== targetH) {
+        this.offscreenCanvas.width = targetW;
+        this.offscreenCanvas.height = targetH;
+      }
+
+      this.offscreenCtx.drawImage(this.videoElement, 0, 0, targetW, targetH);
+      const imageData = this.offscreenCtx.getImageData(0, 0, targetW, targetH);
+
+      this.isWorkerProcessingFrame = true;
+      this.worker.postMessage({
+        type: this.mode === 'DATA' ? 'PROCESS_FRAME_DATA' : 'PROCESS_FRAME_ACK',
+        imageData
+      } as WorkerInputMessage);
     }
 
     if (this.isScanning) {

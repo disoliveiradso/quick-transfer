@@ -6,82 +6,36 @@ import type { ScannedQRInfo } from './receiver/qrScanner';
 import { AudioFeedback } from './receiver/audioFeedback';
 import { getReceivedChunksCount, assembleFile, clearFile } from './db/storage';
 
-interface UserSettings {
-  isCustom: boolean;
-  matrixSize: '1x1' | '2x2' | '3x3';
-  bytesPerQr: number;
-  autoTimerSec: number;
-}
-
-const SETTINGS_STORAGE_KEY = 'quick_transfer_user_settings';
-
-// ESTADO DA APLICAÇÃO
+// ESTADO DA APLICAÇÃO - TRANSMISSOR
 let selectedFile: File | null = null;
-let currentPages: ChunkPayload[][] = [];
-let currentPageIndex: number = 0; // 0-based
-let itemsPerPage: number = 4;
-let bytesPerQr: number = 2000;
-let autoTimerSec: number = 0;
-let autoTimerIntervalId: number | null = null;
-let currentQrZoomLevel: number = 1.0;
+let allChunks: ChunkPayload[] = [];
+let currentChunkIndex: number = 0; // 0-based
+let txScanner: ScannerEngine = new ScannerEngine();
 
-// Estado de Configurações
-let userSettings: UserSettings = loadSettingsFromLocalStorage();
-
-// Scanner & Feedback
-const scanner = new ScannerEngine();
-const audio = new AudioFeedback();
+// ESTADO DA APLICAÇÃO - RECEPTOR
+let rxScanner: ScannerEngine = new ScannerEngine();
 let currentFileIdBeingReceived: string | null = null;
-let activeScannedChunksInPage = new Set<number>();
-let completedPageToastTimeout: number | null = null;
 
-// ELEMENTOS DOM
+// FEEDBACK
+const audio = new AudioFeedback();
+let txSyncLedTimeout: number | null = null;
+
+// ELEMENTOS DOM - NAVEGAÇÃO
 const tabSendBtn = document.getElementById('tab-send-btn') as HTMLButtonElement;
 const tabReceiveBtn = document.getElementById('tab-receive-btn') as HTMLButtonElement;
-const backToSendBtn = document.getElementById('back-to-send-btn') as HTMLButtonElement;
 const backToUploadBtn = document.getElementById('back-to-upload-btn') as HTMLButtonElement;
+const backToSendBtn = document.getElementById('back-to-send-btn') as HTMLButtonElement;
 
+// SEÇÕES
 const transmitterUploadSection = document.getElementById('transmitter-upload-section') as HTMLElement;
 const transmitterDisplaySection = document.getElementById('transmitter-display-section') as HTMLElement;
 const receiverSection = document.getElementById('receiver-section') as HTMLElement;
 
-// Controles de Tela Cheia e Zoom na Página Dedicada
-const zoomInBtn = document.getElementById('zoom-in-btn') as HTMLButtonElement;
-const zoomOutBtn = document.getElementById('zoom-out-btn') as HTMLButtonElement;
 const fullscreenToggleBtn = document.getElementById('fullscreen-toggle-btn') as HTMLButtonElement;
 
-// Modal & Configurações Elements
-const settingsToggleBtn = document.getElementById('settings-toggle-btn') as HTMLButtonElement;
-const settingsModal = document.getElementById('settings-modal') as HTMLElement;
-const closeSettingsBtn = document.getElementById('close-settings-btn') as HTMLButtonElement;
-const saveSettingsBtn = document.getElementById('save-settings-btn') as HTMLButtonElement;
-const resetAutoSettingsBtn = document.getElementById('reset-auto-settings-btn') as HTMLButtonElement;
-
-// Custom Select Elements
-const customMatrixSelect = document.getElementById('custom-matrix-select') as HTMLElement;
-const customSelectValue = document.getElementById('custom-select-value') as HTMLElement;
-const customOptions = document.querySelectorAll('.custom-option');
-
-const qrDensityInput = document.getElementById('qr-density-input') as HTMLInputElement;
-const autoTimerInput = document.getElementById('auto-timer-input') as HTMLInputElement;
-
-// Modal Pop-up de Dialogs
-const appDialogModal = document.getElementById('app-dialog-modal') as HTMLElement;
-const appDialogTitle = document.getElementById('app-dialog-title') as HTMLElement;
-const appDialogMessage = document.getElementById('app-dialog-message') as HTMLElement;
-const appDialogOkBtn = document.getElementById('app-dialog-ok-btn') as HTMLButtonElement;
-
-// Transmissor Elements
+// PREVIEW UPLOAD
 const fileDropzone = document.getElementById('file-dropzone') as HTMLElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
-const qrGridContainer = document.getElementById('qr-grid-container') as HTMLElement;
-const txFileInfo = document.getElementById('tx-file-info') as HTMLElement;
-const txPageIndicator = document.getElementById('tx-page-indicator') as HTMLElement;
-const prevPageBtn = document.getElementById('prev-page-btn') as HTMLButtonElement;
-const nextPageBtn = document.getElementById('next-page-btn') as HTMLButtonElement;
-const autoToggleBtn = document.getElementById('auto-toggle-btn') as HTMLButtonElement;
-
-// Preview Elements
 const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
 const previewMediaWrapper = document.getElementById('preview-media-wrapper') as HTMLElement;
 const previewFileIcon = document.getElementById('preview-file-icon') as HTMLElement;
@@ -90,37 +44,39 @@ const previewFileExt = document.getElementById('preview-file-ext') as HTMLElemen
 const startTransferBtn = document.getElementById('start-transfer-btn') as HTMLButtonElement;
 const addAnotherFileBtn = document.getElementById('add-another-file-btn') as HTMLButtonElement;
 
-// Receptor Elements & Foto Snapshot
-const scannerVideo = document.getElementById('scanner-video') as HTMLVideoElement;
-const scannerOverlay = document.getElementById('scanner-overlay') as HTMLCanvasElement;
-const capturedSnapshotCanvas = document.getElementById('captured-snapshot-canvas') as HTMLCanvasElement;
-const scanlineAnim = document.getElementById('scanline-anim') as HTMLElement;
-const capturePhotoBtn = document.getElementById('capture-photo-btn') as HTMLButtonElement;
-const retakePhotoBtn = document.getElementById('retake-photo-btn') as HTMLButtonElement;
+// TRANSMISSOR DISPLAY (OPTICAL HANDSHAKE)
+const txFileInfo = document.getElementById('tx-file-info') as HTMLElement;
+const txPageIndicator = document.getElementById('tx-page-indicator') as HTMLElement;
+const txQrContainer = document.getElementById('tx-qr-container') as HTMLElement;
+const txProgressFill = document.getElementById('tx-progress-fill') as HTMLElement;
+const txScannerVideo = document.getElementById('tx-scanner-video') as HTMLVideoElement;
+const txSyncLed = document.getElementById('tx-sync-led') as HTMLElement;
+
+// RECEPTOR DISPLAY (OPTICAL HANDSHAKE)
+const rxScannerVideo = document.getElementById('rx-scanner-video') as HTMLVideoElement;
+const rxScannerOverlay = document.getElementById('rx-scanner-overlay') as HTMLCanvasElement;
+const rxAckCanvas = document.getElementById('rx-ack-canvas') as HTMLCanvasElement;
 const rxFileInfo = document.getElementById('rx-file-info') as HTMLElement;
 const rxProgressFill = document.getElementById('rx-progress-fill') as HTMLElement;
 const rxProgressText = document.getElementById('rx-progress-text') as HTMLElement;
 const rxChunksText = document.getElementById('rx-chunks-text') as HTMLElement;
-const rxPageStatusGrid = document.getElementById('rx-page-status-grid') as HTMLElement;
 const downloadFileBtn = document.getElementById('download-file-btn') as HTMLButtonElement;
 const resetRxBtn = document.getElementById('reset-rx-btn') as HTMLButtonElement;
-const alertToast = document.getElementById('alert-toast') as HTMLElement;
+
+// Modal Pop-up de Dialogs
+const appDialogModal = document.getElementById('app-dialog-modal') as HTMLElement;
+const appDialogTitle = document.getElementById('app-dialog-title') as HTMLElement;
+const appDialogMessage = document.getElementById('app-dialog-message') as HTMLElement;
+const appDialogOkBtn = document.getElementById('app-dialog-ok-btn') as HTMLButtonElement;
 
 // INICIALIZAÇÃO
 function init() {
   setupTabs();
-  setupSettingsModal();
-  setupCustomSelect();
   setupAppDialogModal();
   setupTransmitterEvents();
   setupDisplayControls();
-  setupReceiverPhotoEvents();
-  syncUIWithSettings();
 }
 
-/**
- * Exibe pop-ups de aviso/erro customizados na UI da aplicação em substituição ao alert nativo
- */
 function showAppDialog(message: string, title: string = 'Aviso') {
   appDialogTitle.textContent = title;
   appDialogMessage.textContent = message;
@@ -138,125 +94,6 @@ function setupAppDialogModal() {
   });
 }
 
-function loadSettingsFromLocalStorage(): UserSettings {
-  const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-  if (saved) {
-    try {
-      return JSON.parse(saved);
-    } catch (_) {}
-  }
-  return {
-    isCustom: false,
-    matrixSize: '2x2',
-    bytesPerQr: 2000,
-    autoTimerSec: 0
-  };
-}
-
-function saveSettingsToLocalStorage(settings: UserSettings) {
-  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-}
-
-function syncUIWithSettings() {
-  if (userSettings.isCustom) {
-    updateCustomSelectUI(userSettings.matrixSize);
-    qrDensityInput.value = userSettings.bytesPerQr.toString();
-    autoTimerInput.value = userSettings.autoTimerSec.toString();
-  } else {
-    updateCustomSelectUI(null);
-    qrDensityInput.value = '';
-    autoTimerInput.value = '';
-  }
-}
-
-// Configuração do Custom Select Dropdown
-function setupCustomSelect() {
-  const trigger = customMatrixSelect.querySelector('.custom-select-trigger');
-  
-  trigger?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    customMatrixSelect.classList.toggle('open');
-  });
-
-  document.addEventListener('click', () => {
-    customMatrixSelect.classList.remove('open');
-  });
-
-  customOptions.forEach(opt => {
-    opt.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const val = (opt as HTMLElement).dataset.value as UserSettings['matrixSize'];
-      updateCustomSelectUI(val);
-      customMatrixSelect.classList.remove('open');
-    });
-  });
-}
-
-function updateCustomSelectUI(val: UserSettings['matrixSize'] | null) {
-  if (!val) {
-    customOptions.forEach(opt => opt.classList.remove('selected'));
-    customSelectValue.textContent = 'Selecione...';
-    customMatrixSelect.dataset.value = '';
-    return;
-  }
-
-  customOptions.forEach(opt => {
-    const optEl = opt as HTMLElement;
-    if (optEl.dataset.value === val) {
-      optEl.classList.add('selected');
-      customSelectValue.textContent = optEl.textContent || '';
-    } else {
-      optEl.classList.remove('selected');
-    }
-  });
-  customMatrixSelect.dataset.value = val;
-}
-
-// Configurações e Modal
-function setupSettingsModal() {
-  settingsToggleBtn.addEventListener('click', () => {
-    syncUIWithSettings();
-    settingsModal.style.display = 'flex';
-  });
-
-  closeSettingsBtn.addEventListener('click', () => {
-    settingsModal.style.display = 'none';
-  });
-
-  settingsModal.addEventListener('click', (e) => {
-    if (e.target === settingsModal) {
-      settingsModal.style.display = 'none';
-    }
-  });
-
-  saveSettingsBtn.addEventListener('click', () => {
-    const selectedMatrix = (customMatrixSelect.dataset.value as UserSettings['matrixSize']) || '2x2';
-    userSettings = {
-      isCustom: true,
-      matrixSize: selectedMatrix,
-      bytesPerQr: parseInt(qrDensityInput.value, 10) || 2000,
-      autoTimerSec: parseInt(autoTimerInput.value, 10) || 0
-    };
-    saveSettingsToLocalStorage(userSettings);
-    settingsModal.style.display = 'none';
-    if (selectedFile) rebuildTransmission();
-  });
-
-  resetAutoSettingsBtn.addEventListener('click', () => {
-    userSettings = {
-      isCustom: false,
-      matrixSize: '2x2',
-      bytesPerQr: 2000,
-      autoTimerSec: 0
-    };
-    saveSettingsToLocalStorage(userSettings);
-    syncUIWithSettings();
-    settingsModal.style.display = 'none';
-    if (selectedFile) rebuildTransmission();
-  });
-}
-
-// Alternância de Abas e Navegação Entre Páginas Dedicadas
 function setupTabs() {
   window.addEventListener('popstate', (e) => {
     const state = e.state;
@@ -271,16 +108,14 @@ function setupTabs() {
         showReceiverView(false);
       }
     } else {
-      // Estado inicial padrão
       showTransmitterUploadView(false);
     }
   });
 
-  // Salva o estado inicial
   history.replaceState({ tab: 'send', view: 'upload' }, '');
 
   tabSendBtn.addEventListener('click', () => {
-    if (selectedFile && currentPages.length > 0) {
+    if (selectedFile && allChunks.length > 0) {
       showTransmitterDisplayView(true);
     } else {
       showTransmitterUploadView(true);
@@ -291,11 +126,7 @@ function setupTabs() {
 
   if (backToSendBtn) {
     backToSendBtn.addEventListener('click', () => {
-      if (selectedFile && currentPages.length > 0) {
-        showTransmitterDisplayView(true);
-      } else {
-        showTransmitterUploadView(true);
-      }
+      showTransmitterUploadView(true);
     });
   }
 
@@ -312,8 +143,8 @@ function showTransmitterUploadView(pushHistory: boolean) {
   transmitterDisplaySection.classList.remove('active');
   receiverSection.classList.remove('active');
   
-  scanner.stop();
-  stopAutoTimer();
+  txScanner.stop();
+  rxScanner.stop();
 
   if (pushHistory) {
     history.pushState({ tab: 'send', view: 'upload' }, '');
@@ -328,7 +159,9 @@ function showTransmitterDisplayView(pushHistory: boolean) {
   transmitterDisplaySection.classList.add('active');
   receiverSection.classList.remove('active');
   
-  scanner.stop();
+  rxScanner.stop();
+  
+  startOpticalTransmitter();
 
   if (pushHistory) {
     history.pushState({ tab: 'send', view: 'display' }, '');
@@ -343,30 +176,15 @@ function showReceiverView(pushHistory: boolean) {
   transmitterUploadSection.classList.remove('active');
   transmitterDisplaySection.classList.remove('active');
   
-  stopAutoTimer();
-  startReceiverScanner();
+  txScanner.stop();
+  startOpticalReceiver();
 
   if (pushHistory) {
     history.pushState({ tab: 'receive' }, '');
   }
 }
 
-// Controles da Página Dedicada (Zoom & Tela Cheia)
 function setupDisplayControls() {
-  zoomInBtn.addEventListener('click', () => {
-    if (currentQrZoomLevel < 1.6) {
-      currentQrZoomLevel += 0.15;
-      qrGridContainer.style.transform = `scale(${currentQrZoomLevel})`;
-    }
-  });
-
-  zoomOutBtn.addEventListener('click', () => {
-    if (currentQrZoomLevel > 0.6) {
-      currentQrZoomLevel -= 0.15;
-      qrGridContainer.style.transform = `scale(${currentQrZoomLevel})`;
-    }
-  });
-
   fullscreenToggleBtn.addEventListener('click', () => {
     if (!document.fullscreenElement) {
       transmitterDisplaySection.requestFullscreen?.().catch(_ => {});
@@ -431,13 +249,15 @@ function handleFileSelection(file: File) {
   previewMediaWrapper.style.display = hasPreview ? 'flex' : 'none';
   filePreviewContainer.style.display = 'block';
   
-  // Oculta a área de dropzone principal já que a visualização assumiu
   if (fileDropzone.parentElement) {
     fileDropzone.parentElement.style.display = 'none';
   }
 }
 
-// LÓGICA DO TRANSMISSOR
+// -------------------------------------------------------------
+// TRANSMISSOR (OPTICAL HANDSHAKE)
+// -------------------------------------------------------------
+
 function setupTransmitterEvents() {
   fileDropzone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
@@ -454,292 +274,122 @@ function setupTransmitterEvents() {
   });
 
   addAnotherFileBtn.addEventListener('click', () => fileInput.click());
-
-  prevPageBtn.addEventListener('click', () => {
-    if (currentPageIndex > 0) {
-      currentPageIndex--;
-      renderCurrentTransmitterPage();
-    }
-  });
-
-  nextPageBtn.addEventListener('click', () => {
-    if (currentPageIndex < currentPages.length - 1) {
-      currentPageIndex++;
-      renderCurrentTransmitterPage();
-    }
-  });
-
-  autoToggleBtn.addEventListener('click', () => {
-    if (autoTimerIntervalId) {
-      stopAutoTimer();
-    } else {
-      startAutoTimer();
-    }
-  });
-}
-
-/**
- * Ajusta automaticamente o tamanho da matriz (Grid) e a densidade com base na quantidade total de QR Codes necessários.
- * Regra Automática Atualizada:
- * - Se precisar de <= 4 QRs no total: exibe TODOS juntos na mesma página (ex: 2 QRs, 3 QRs ou 4 QRs).
- * - Se precisar de > 4 QRs no total: divide em pares/páginas com no máximo 4 QRs por página (ex: 6 QRs ➔ 1ª página com 4 QRs + 2ª página com 2 QRs).
- */
-function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; itemsPerPage: number; bytes: number } {
-  if (userSettings.isCustom) {
-    let items = 4;
-    if (userSettings.matrixSize === '1x1') items = 1;
-    if (userSettings.matrixSize === '3x3') items = 9;
-    return {
-      matrixStr: userSettings.matrixSize,
-      itemsPerPage: items,
-      bytes: userSettings.bytesPerQr
-    };
-  }
-
-  // No modo automático, usa 2000 bytes por QR para garantir leitura ultra estável
-  const bytes = 2000;
-  const totalChunksNeeded = Math.ceil(fileSize / bytes);
-
-  let itemsPerPage = 4;
-  let matrixStr: '1x1' | '2x2' | '3x3' = '2x2';
-
-  if (totalChunksNeeded <= 1) {
-    itemsPerPage = 1;
-    matrixStr = '1x1';
-  } else if (totalChunksNeeded <= 4) {
-    // Se precisar de 2, 3 ou 4 QRs, coloca TODOS na mesma página para leitura simultânea!
-    itemsPerPage = totalChunksNeeded;
-    matrixStr = '2x2';
-  } else {
-    // Mais de 4 QRs ➔ usa páginas em blocos de 4 por página (ex: 6 QRs = 4 + 2)
-    itemsPerPage = 4;
-    matrixStr = '2x2';
-  }
-
-  return { matrixStr, itemsPerPage, bytes };
 }
 
 async function rebuildTransmission() {
   if (!selectedFile) return;
+
+  // Usa o novo sistema sem Grid, divide em densidade ultra-otimizada
+  const bytesPerQr = 2200; 
+  const { pages } = await chunkFileForGrid(selectedFile, bytesPerQr, 1);
   
-  // Abre a Página Dedicada de Exibição dos QR Codes e atualiza histórico
+  // Como itemsPerPage é 1, achata as páginas
+  allChunks = pages.flat();
+  currentChunkIndex = 0;
+
   showTransmitterDisplayView(true);
+}
 
-  const autoConfig = applyAutomaticSettings(selectedFile.size);
-  itemsPerPage = autoConfig.itemsPerPage;
-  bytesPerQr = autoConfig.bytes;
-  autoTimerSec = userSettings.autoTimerSec;
+function startOpticalTransmitter() {
+  if (!selectedFile || allChunks.length === 0) return;
 
-  qrGridContainer.setAttribute('data-matrix', autoConfig.matrixStr);
-
-  const { pages, totalChunks } = await chunkFileForGrid(selectedFile, bytesPerQr, itemsPerPage);
-  currentPages = pages;
-  currentPageIndex = 0;
-
-  txFileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)}) • Grid ${autoConfig.matrixStr} (${totalChunks} QRs em ${pages.length} pág${pages.length > 1 ? 's' : ''})`;
+  txFileInfo.textContent = `Enviando: ${selectedFile.name}`;
+  txProgressFill.style.width = '0%';
   
-  renderCurrentTransmitterPage();
-}
+  renderCurrentTxQR();
 
-async function renderCurrentTransmitterPage() {
-  if (!currentPages || currentPages.length === 0) return;
+  // Configura a câmera do Transmissor para ler os ACKs do Receptor
+  txScanner.onAckDecoded = (ackContent) => {
+    if (currentChunkIndex >= allChunks.length) return;
 
-  const pageChunks = currentPages[currentPageIndex];
-  const totalPages = currentPages.length;
+    const currentChunk = allChunks[currentChunkIndex];
+    const expectedAck = `ACK:${currentChunk.header.fId}:${currentChunk.header.ci}`;
 
-  txPageIndicator.textContent = `Página ${currentPageIndex + 1} de ${totalPages}`;
-
-  prevPageBtn.disabled = currentPageIndex === 0;
-  nextPageBtn.disabled = currentPageIndex === totalPages - 1;
-
-  // IMPORTANTE: O botão Auto-Passo SÓ fica ativo se houver mais de 1 página para passar!
-  if (totalPages <= 1) {
-    stopAutoTimer();
-    autoToggleBtn.disabled = true;
-    autoToggleBtn.style.opacity = '0.4';
-    autoToggleBtn.style.cursor = 'not-allowed';
-    autoToggleBtn.title = 'Apenas 1 página disponível';
-  } else {
-    autoToggleBtn.disabled = false;
-    autoToggleBtn.style.opacity = '1';
-    autoToggleBtn.style.cursor = 'pointer';
-    autoToggleBtn.title = '';
-  }
-
-  qrGridContainer.innerHTML = '';
-
-  for (const chunk of pageChunks) {
-    const itemEl = document.createElement('div');
-    itemEl.className = 'qr-item';
-
-    const canvas = document.createElement('canvas');
-    await renderQRCodeToCanvas(canvas, chunk.qrSegmentData);
-
-    const label = document.createElement('div');
-    label.className = 'qr-label';
-    label.textContent = `QR ${chunk.header.ci + 1}/${chunk.header.tc} (Pos ${chunk.header.i + 1}/${chunk.header.tip})`;
-
-    itemEl.appendChild(canvas);
-    itemEl.appendChild(label);
-    qrGridContainer.appendChild(itemEl);
-  }
-}
-
-function startAutoTimer() {
-  if (currentPages.length <= 1) return; // Não ativa se só tiver 1 página
-
-  const interval = (autoTimerSec > 0 ? autoTimerSec : 4) * 1000;
-  autoToggleBtn.textContent = '⏸ Pausar Auto';
-  autoToggleBtn.classList.add('btn-secondary');
-
-  autoTimerIntervalId = window.setInterval(() => {
-    if (currentPageIndex < currentPages.length - 1) {
-      currentPageIndex++;
-    } else {
-      currentPageIndex = 0; // Loop contínuo
-    }
-    renderCurrentTransmitterPage();
-  }, interval);
-}
-
-function stopAutoTimer() {
-  if (autoTimerIntervalId) {
-    clearInterval(autoTimerIntervalId);
-    autoTimerIntervalId = null;
-  }
-  autoToggleBtn.textContent = '▶ Auto-Passo';
-  autoToggleBtn.classList.remove('btn-secondary');
-}
-
-let isPhotoCapturedState = false;
-let capturedImageData: ImageData | null = null;
-let scanlineLoopInterval: number | null = null;
-
-function setupReceiverPhotoEvents() {
-  capturePhotoBtn.addEventListener('click', () => {
-    capturedImageData = scanner.captureSnapshot(capturedSnapshotCanvas);
-    if (capturedImageData) {
-      isPhotoCapturedState = true;
-
-      // Oculta vídeo da câmera e exibe a foto congelada na tela
-      scannerVideo.style.display = 'none';
-      capturedSnapshotCanvas.style.display = 'block';
-
-      // Ativa animação laser de varredura (Scanline)
-      scanlineAnim.style.display = 'block';
-
-      // Alterna botões
-      capturePhotoBtn.style.display = 'none';
-      retakePhotoBtn.style.display = 'inline-flex';
-
-      // Envia o frame estático para o Web Worker varrer e decodificar todos os QRs simultaneamente
-      runPhotoScanIteration();
-      scanlineLoopInterval = window.setInterval(runPhotoScanIteration, 1200);
-    }
-  });
-
-  retakePhotoBtn.addEventListener('click', resetPhotoStateToLiveCamera);
-}
-
-function runPhotoScanIteration() {
-  if (isPhotoCapturedState && capturedImageData) {
-    scanner.processSnapshotImageData(capturedImageData);
-  }
-}
-
-function resetPhotoStateToLiveCamera() {
-  isPhotoCapturedState = false;
-  capturedImageData = null;
-
-  if (scanlineLoopInterval) {
-    clearInterval(scanlineLoopInterval);
-    scanlineLoopInterval = null;
-  }
-
-  scannerVideo.style.display = 'block';
-  capturedSnapshotCanvas.style.display = 'none';
-  scanlineAnim.style.display = 'none';
-
-  capturePhotoBtn.style.display = 'inline-flex';
-  retakePhotoBtn.style.display = 'none';
-
-  // Limpa o overlay de checks verdes
-  const ctx = scannerOverlay.getContext('2d');
-  if (ctx) {
-    ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
-  }
-  
-  // Limpa a leitura da página atual (opcionalmente) para que o usuário possa escanear a página do zero se estava dando erro
-  activeScannedChunksInPage.clear();
-}
-
-// LÓGICA DO RECEPTOR
-function startReceiverScanner() {
-  scanner.onMultiQrAutoTrigger = () => {
-    // Quando a câmera detectar múltiplos QR codes e a imagem estiver focada/nítida, dispara a foto automaticamente!
-    if (!isPhotoCapturedState) {
-      triggerAutoSnapshot();
+    if (ackContent === expectedAck) {
+      // Recebeu o ACK correto! Pisca o LED virtual e avança imediatamente
+      flashTxSyncLed();
+      audio.playSuccessBeep();
+      
+      currentChunkIndex++;
+      
+      if (currentChunkIndex < allChunks.length) {
+        renderCurrentTxQR();
+      } else {
+        txPageIndicator.textContent = "100%";
+        txProgressFill.style.width = "100%";
+        txFileInfo.textContent = "Transferência Concluída!";
+        txQrContainer.innerHTML = '<div style="color: var(--accent-success); font-size: 3rem;">✓</div>';
+        txScanner.stop();
+      }
     }
   };
 
-  scanner.onSnapshotDecoded = handleQRsDetected;
-
-  scanner.start(scannerVideo).catch(err => {
-    console.error('Erro ao acessar a câmera:', err);
-    showAppDialog('Erro ao acessar a câmera. Certifique-se de conceder permissão no navegador.', 'Permissão Negada');
+  txScanner.start(txScannerVideo, 'ACK').catch(err => {
+    console.error('Erro na câmera frontal (Transmissor):', err);
   });
 }
 
-function triggerAutoSnapshot() {
-  capturedImageData = scanner.captureSnapshot(capturedSnapshotCanvas);
-  if (capturedImageData) {
-    isPhotoCapturedState = true;
+async function renderCurrentTxQR() {
+  if (currentChunkIndex >= allChunks.length) return;
 
-    // Oculta vídeo da câmera e exibe a foto congelada nítida
-    scannerVideo.style.display = 'none';
-    capturedSnapshotCanvas.style.display = 'block';
+  const chunk = allChunks[currentChunkIndex];
+  const total = allChunks.length;
+  const pct = Math.round(((currentChunkIndex) / total) * 100);
 
-    // Ativa animação laser de varredura (Scanline)
-    scanlineAnim.style.display = 'block';
+  txPageIndicator.textContent = `${pct}%`;
+  txProgressFill.style.width = `${pct}%`;
 
-    // Alterna botões
-    capturePhotoBtn.style.display = 'none';
-    retakePhotoBtn.style.display = 'inline-flex';
-
-    // Executa a decodificação da foto congelada
-    runPhotoScanIteration();
-    scanlineLoopInterval = window.setInterval(runPhotoScanIteration, 1000);
-  }
+  txQrContainer.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  await renderQRCodeToCanvas(canvas, chunk.qrSegmentData);
+  canvas.style.maxWidth = '100%';
+  canvas.style.maxHeight = '50vh';
+  canvas.style.objectFit = 'contain';
+  
+  txQrContainer.appendChild(canvas);
 }
 
-function handleQRsDetected(results: ScannedQRInfo[]) {
+function flashTxSyncLed() {
+  txSyncLed.style.background = '#10b981'; // Verde
+  if (txSyncLedTimeout) clearTimeout(txSyncLedTimeout);
+  txSyncLedTimeout = window.setTimeout(() => {
+    txSyncLed.style.background = 'var(--text-muted)';
+  }, 100);
+}
+
+
+// -------------------------------------------------------------
+// RECEPTOR (OPTICAL HANDSHAKE)
+// -------------------------------------------------------------
+
+function startOpticalReceiver() {
+  rxScanner.onDataDecoded = handleDataDecoded;
+
+  rxScanner.start(rxScannerVideo, 'DATA').catch(err => {
+    console.error('Erro ao acessar a câmera principal (Receptor):', err);
+    showAppDialog('Erro ao acessar a câmera. Conceda as permissões.', 'Permissão Negada');
+  });
+}
+
+async function handleDataDecoded(results: ScannedQRInfo[]) {
   if (!results || results.length === 0) return;
 
-  const first = results[0];
-  const header = first.header;
+  const res = results[0]; // Como é 1x1, pega o primeiro
+  const header = res.header;
 
   if (currentFileIdBeingReceived !== header.fId) {
     currentFileIdBeingReceived = header.fId;
-    activeScannedChunksInPage.clear();
     rxFileInfo.textContent = `${header.fn} (${formatBytes(header.fs)})`;
   }
 
-  let isNewChunkAdded = false;
-  results.forEach(res => {
-    if (!activeScannedChunksInPage.has(res.header.ci)) {
-      activeScannedChunksInPage.add(res.header.ci);
-      isNewChunkAdded = true;
-    }
-  });
+  // Gera o QR de ACK imediatamente para o Transmissor ver e avançar
+  const ackString = `ACK:${header.fId}:${header.ci}`;
+  await renderQRCodeToCanvas(rxAckCanvas, ackString);
 
-  if (isNewChunkAdded) {
-    audio.playSuccessBeep();
-    updateReceiverProgress(header);
-    drawOverlayFeedbacks(results);
-  }
-}
+  audio.playSuccessBeep();
+  drawReceiverOverlayFeedbacks();
 
-async function updateReceiverProgress(header: ScannedQRInfo['header']) {
+  // Atualiza Progresso na UI
   const receivedSet = await getReceivedChunksCount(header.fId);
   const total = header.tc;
   const received = receivedSet.size;
@@ -749,118 +399,41 @@ async function updateReceiverProgress(header: ScannedQRInfo['header']) {
   rxProgressText.textContent = `${pct}% recebido`;
   rxChunksText.textContent = `${received} / ${total} chunks`;
 
-  // Renderiza badges da página atual
-  rxPageStatusGrid.innerHTML = '';
-  const startChunkInPage = (header.p - 1) * header.tip;
-
-  for (let i = 0; i < header.tip; i++) {
-    const chunkIdx = startChunkInPage + i;
-    const isDone = receivedSet.has(chunkIdx);
-
-    const badge = document.createElement('div');
-    badge.className = `status-badge ${isDone ? 'success' : 'pending'}`;
-    badge.innerHTML = `${isDone ? '✓' : '⏳'} Item ${i + 1} (${chunkIdx + 1}/${total})`;
-    rxPageStatusGrid.appendChild(badge);
-  }
-
-  // Verifica se TODOS os QRs da página atual foram lidos
-  let pageComplete = true;
-  for (let i = 0; i < header.tip; i++) {
-    const chunkIdx = startChunkInPage + i;
-    if (!receivedSet.has(chunkIdx)) {
-      pageComplete = false;
-      break;
-    }
-  }
-
-  if (pageComplete) {
-    showCompletedPageToast();
-  }
-
-  // Se 100% do arquivo foi concluído
+  // Se completou
   if (received >= total) {
+    rxScanner.stop(); // Para a câmera para poupar processamento
     downloadFileBtn.style.display = 'inline-flex';
     downloadFileBtn.onclick = () => handleDownloadFile(header.fId, header.fn);
   }
 }
 
-function drawOverlayFeedbacks(results: ScannedQRInfo[]) {
-  const ctx = scannerOverlay.getContext('2d');
-  if (!ctx || !scannerVideo) return;
+function drawReceiverOverlayFeedbacks() {
+  const ctx = rxScannerOverlay.getContext('2d');
+  if (!ctx || !rxScannerVideo) return;
 
-  const displayWidth = scannerVideo.clientWidth || 480;
-  const displayHeight = scannerVideo.clientHeight || 640;
+  const displayWidth = rxScannerVideo.clientWidth || 480;
+  const displayHeight = rxScannerVideo.clientHeight || 640;
 
-  if (scannerOverlay.width !== displayWidth || scannerOverlay.height !== displayHeight) {
-    scannerOverlay.width = displayWidth;
-    scannerOverlay.height = displayHeight;
+  if (rxScannerOverlay.width !== displayWidth || rxScannerOverlay.height !== displayHeight) {
+    rxScannerOverlay.width = displayWidth;
+    rxScannerOverlay.height = displayHeight;
   }
 
-  const nativeWidth = scannerVideo.videoWidth || displayWidth;
-  const nativeHeight = scannerVideo.videoHeight || displayHeight;
+  ctx.clearRect(0, 0, rxScannerOverlay.width, rxScannerOverlay.height);
 
-  // Fatores de escala entre a resolução nativa do vídeo (ex: 1920x1080) e o tamanho renderizado na tela
-  const scaleX = displayWidth / nativeWidth;
-  const scaleY = displayHeight / nativeHeight;
-
-  ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
-
-  results.forEach(res => {
-    if (res.position) {
-      const { topLeft, topRight, bottomRight, bottomLeft } = res.position;
-
-      // Converte coordenadas da resolução nativa para as coordenadas da tela
-      const pTopLeft = { x: topLeft.x * scaleX, y: topLeft.y * scaleY };
-      const pTopRight = { x: topRight.x * scaleX, y: topRight.y * scaleY };
-      const pBottomRight = { x: bottomRight.x * scaleX, y: bottomRight.y * scaleY };
-      const pBottomLeft = { x: bottomLeft.x * scaleX, y: bottomLeft.y * scaleY };
-
-      // Desenha o polígono delimitador com escala ajustada
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(pTopLeft.x, pTopLeft.y);
-      ctx.lineTo(pTopRight.x, pTopRight.y);
-      ctx.lineTo(pBottomRight.x, pBottomRight.y);
-      ctx.lineTo(pBottomLeft.x, pBottomLeft.y);
-      ctx.closePath();
-      ctx.stroke();
-
-      // Fundo semi-transparente verde no QR lido
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
-      ctx.fill();
-
-      // Desenha o ícone de Check verde (✓) no centro exato escalado
-      const centerX = (pTopLeft.x + pBottomRight.x) / 2;
-      const centerY = (pTopLeft.y + pBottomRight.y) / 2;
-
-      ctx.fillStyle = '#10b981';
-      ctx.font = 'bold 28px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('✓', centerX, centerY);
-    }
-  });
+  // Pisca a tela inteira em verde levemente
+  ctx.fillStyle = 'rgba(16, 185, 129, 0.3)';
+  ctx.fillRect(0, 0, displayWidth, displayHeight);
 
   setTimeout(() => {
-    ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
-  }, 600);
-}
-
-function showCompletedPageToast() {
-  audio.playPageCompleteChime();
-  alertToast.classList.add('show');
-
-  if (completedPageToastTimeout) clearTimeout(completedPageToastTimeout);
-  completedPageToastTimeout = window.setTimeout(() => {
-    alertToast.classList.remove('show');
-  }, 2500);
+    ctx.clearRect(0, 0, rxScannerOverlay.width, rxScannerOverlay.height);
+  }, 100);
 }
 
 async function handleDownloadFile(fileId: string, fileName: string) {
   const blob = await assembleFile(fileId);
   if (!blob) {
-    showAppDialog('Erro ao montar o arquivo final a partir dos pedaços salvos.', 'Erro de Leitura');
+    showAppDialog('Erro ao montar o arquivo final.', 'Erro de Leitura');
     return;
   }
 
@@ -879,13 +452,19 @@ resetRxBtn.addEventListener('click', async () => {
     await clearFile(currentFileIdBeingReceived);
   }
   currentFileIdBeingReceived = null;
-  activeScannedChunksInPage.clear();
   rxProgressFill.style.width = '0%';
   rxProgressText.textContent = '0% recebido';
   rxChunksText.textContent = '0 / 0 chunks';
-  rxPageStatusGrid.innerHTML = '';
   rxFileInfo.textContent = 'Nenhum arquivo lido';
   downloadFileBtn.style.display = 'none';
+  
+  // Limpa o canvas de ACK
+  const ctx = rxAckCanvas.getContext('2d');
+  if (ctx) ctx.clearRect(0, 0, rxAckCanvas.width, rxAckCanvas.height);
+  
+  if (!rxScannerVideo.srcObject) {
+    startOpticalReceiver();
+  }
 });
 
 function formatBytes(bytes: number): string {
