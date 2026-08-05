@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quick Transfer - Air-Gapped Offline PWA</title>
+    <meta name="description" content="Transferência de arquivos offline entre dispositivos isolados via leitura visual de QR Codes estáticos em matriz." />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-CKrxeIsS.js"></script>
+    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-C3SOI8yI.css">
+  <link rel="manifest" href="/quick-transfer-pwa/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer-pwa/registerSW.js"></script></head>
+  <body>
+    <!-- App Header -->
+    <header class="app-header">
+      <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        <span>Quick Transfer</span>
+      </div>
+      <nav class="nav-tabs">
+        <button id="tab-send-btn" class="tab-btn active">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Enviar (Transmissor)
+        </button>
+        <button id="tab-receive-btn" class="tab-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Receber (Receptor)
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-container">
+      
+      <!-- TRANSMITTER SECTION -->
+      <section id="transmitter-section" class="view-section active">
+        <!-- Configuration Card -->
+        <div class="card">
+          <h2 class="card-title">Configurações de Transmissão</h2>
+          <div class="controls-grid">
+            <div class="control-group">
+              <label for="matrix-size-select">Tamanho da Matriz (Grid)</label>
+              <select id="matrix-size-select">
+                <option value="1x1">1x1 (1 QR Code por tela)</option>
+                <option value="2x2" selected>2x2 (4 QR Codes por tela)</option>
+                <option value="3x3">3x3 (9 QR Codes por tela)</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="qr-density-input">Bytes por QR Code</label>
+              <input type="number" id="qr-density-input" value="2000" min="500" max="2900" step="100" />
+            </div>
+            <div class="control-group">
+              <label for="auto-timer-input">Timer Automático (segundos)</label>
+              <input type="number" id="auto-timer-input" value="0" min="0" max="60" placeholder="0 = Manual" />
+            </div>
+          </div>
+        </div>
+
+        <!-- File Upload Area -->
+        <div class="card">
+          <div id="file-dropzone" class="file-dropzone">
+            <input type="file" id="file-input" />
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p style="font-weight: 600; margin-bottom: 0.25rem;">Clique para selecionar um arquivo</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Qualquer formato é suportado</p>
+          </div>
+        </div>
+
+        <!-- QR Grid Display -->
+        <div id="transmitter-display-card" class="card grid-display-wrapper" style="display: none;">
+          <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+            <div id="tx-file-info" style="font-weight: 600; font-size: 0.95rem;"></div>
+            <div id="tx-page-indicator" style="font-weight: 700; color: var(--accent-primary);">Página 1 de 1</div>
+          </div>
+
+          <div id="qr-grid-container" class="qr-grid" data-matrix="2x2">
+            <!-- QR items rendered dynamically -->
+          </div>
+
+          <div class="nav-controls">
+            <button id="prev-page-btn" class="btn btn-secondary">
+              &larr; Página Anterior
+            </button>
+            <button id="auto-toggle-btn" class="btn btn-secondary">
+              ▶ Iniciar Auto-Passo
+            </button>
+            <button id="next-page-btn" class="btn">
+              Próxima Página &rarr;
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RECEIVER SECTION -->
+      <section id="receiver-section" class="view-section">
+        <!-- Camera View Card -->
+        <div class="card">
+          <h2 class="card-title">Câmera do Receptor</h2>
+          <div class="scanner-wrapper">
+            <video id="scanner-video" class="scanner-video" playsinline muted></video>
+            <canvas id="scanner-overlay" class="scanner-overlay-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- Reception Status Card -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="card-title" style="margin-bottom: 0;">Progresso da Transferência</h2>
+            <div id="rx-file-info" style="font-size: 0.85rem; color: var(--text-muted);">Nenhum arquivo sendo lido</div>
+          </div>
+
+          <div class="progress-bar-container">
+            <div id="rx-progress-fill" class="progress-fill"></div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">
+            <span id="rx-progress-text">0% recebido</span>
+            <span id="rx-chunks-text">0 / 0 chunks</span>
+          </div>
+
+          <div id="rx-page-status-grid" class="page-status-grid">
+            <!-- Status badges da página atual renderizadas dinamicamente -->
+          </div>
+
+          <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <button id="download-file-btn" class="btn" style="flex: 1; display: none; justify-content: center; background: var(--accent-success);">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Baixar Arquivo Completo
+            </button>
+            <button id="reset-rx-btn" class="btn btn-secondary">
+              Limpar / Reiniciar
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Visual Toast -->
+    <div id="alert-toast" class="alert-toast">
+      ✓ Página Concluída!
+    </div>
+
+  </body>
+</html>

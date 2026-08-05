@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/quick-transfer-pwa/sw.js', { scope: '/quick-transfer-pwa/' })})}
