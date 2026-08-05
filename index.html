@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-BN6dmWOv.js"></script>
-    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-BzFRYZgm.css">
+    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-BhIhKAyz.js"></script>
+    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-CQ0qnrC_.css">
   <link rel="manifest" href="/quick-transfer-pwa/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer-pwa/registerSW.js"></script></head>
   <body>
     <!-- App Header -->
@@ -24,7 +24,7 @@
       </button>
     </header>
 
-    <!-- Modal de Configurações Discreto -->
+    <!-- Modal de Configurações Adaptativo -->
     <div id="settings-modal" class="modal-backdrop" style="display: none;">
       <div class="modal-card">
         <div class="modal-header">
@@ -49,51 +49,60 @@
             <input type="number" id="auto-timer-input" value="0" min="0" max="60" placeholder="0 = Manual" />
           </div>
         </div>
-        <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; justify-content: flex-end; flex-wrap: wrap;">
-          <button id="reset-auto-settings-btn" class="btn btn-secondary" style="font-size: 0.85rem;">
+        <div class="modal-actions">
+          <button id="reset-auto-settings-btn" class="btn btn-secondary full-width-btn">
             Voltar para Modo Automático
           </button>
-          <button id="save-settings-btn" class="btn" style="font-size: 0.85rem;">
+          <button id="save-settings-btn" class="btn full-width-btn">
             Salvar e Manter Configuração
           </button>
         </div>
       </div>
     </div>
 
+    <!-- Modal Pop-up Genérico de Mensagens/Alertas da Aplicação -->
+    <div id="app-dialog-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-card" style="max-width: 420px; text-align: center;">
+        <h3 id="app-dialog-title" class="modal-title" style="margin-bottom: 0.75rem;">Aviso</h3>
+        <p id="app-dialog-message" style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.4; word-break: break-word;"></p>
+        <button id="app-dialog-ok-btn" class="btn full-width-btn">OK</button>
+      </div>
+    </div>
+
     <!-- Main Container -->
     <main class="main-container">
 
-      <!-- File Upload Area (Topo) -->
-      <div class="card" style="margin-bottom: 1rem;">
-        <div id="file-dropzone" class="file-dropzone">
-          <input type="file" id="file-input" />
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p style="font-weight: 600; margin-bottom: 0.25rem;">Clique para selecionar um arquivo</p>
-          <p style="font-size: 0.85rem; color: var(--text-muted);">Qualquer formato é suportado</p>
-        </div>
-      </div>
-
-      <!-- Abas Ajustadas à Largura da Área de Arquivo (Abaixo do File Upload) -->
-      <div style="margin-bottom: 1.5rem;">
-        <nav class="nav-tabs full-width-tabs">
-          <button id="tab-send-btn" class="tab-btn active">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            Enviar (Transmissor)
-          </button>
-          <button id="tab-receive-btn" class="tab-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            Receber (Receptor)
-          </button>
-        </nav>
-      </div>
-
-      <!-- TRANSMITTER SECTION -->
+      <!-- TRANSMITTER VIEW SECTION -->
       <section id="transmitter-section" class="view-section active">
+        <!-- File Upload Area -->
+        <div class="card" style="margin-bottom: 1rem;">
+          <div id="file-dropzone" class="file-dropzone">
+            <input type="file" id="file-input" />
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p style="font-weight: 600; margin-bottom: 0.25rem; white-space: normal;">Clique para selecionar um arquivo</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); white-space: normal;">Qualquer formato é suportado</p>
+          </div>
+        </div>
+
+        <!-- Abas Ajustadas na Transmissão -->
+        <div style="margin-bottom: 1rem;">
+          <nav class="nav-tabs full-width-tabs">
+            <button id="tab-send-btn" class="tab-btn active">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              <span>Enviar (Transmissor)</span>
+            </button>
+            <button id="tab-receive-btn" class="tab-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span>Receber (Receptor)</span>
+            </button>
+          </nav>
+        </div>
+
         <!-- QR Grid Display -->
         <div id="transmitter-display-card" class="card grid-display-wrapper" style="display: none;">
-          <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-            <div id="tx-file-info" style="font-weight: 600; font-size: 0.95rem;"></div>
-            <div id="tx-page-indicator" style="font-weight: 700; color: var(--accent-primary);">Página 1 de 1</div>
+          <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <div id="tx-file-info" style="font-weight: 600; font-size: 0.9rem; word-break: break-all;"></div>
+            <div id="tx-page-indicator" style="font-weight: 700; color: var(--accent-primary); font-size: 0.9rem; white-space: nowrap;">Página 1 de 1</div>
           </div>
 
           <div id="qr-grid-container" class="qr-grid" data-matrix="2x2">
@@ -102,34 +111,41 @@
 
           <div class="nav-controls">
             <button id="prev-page-btn" class="btn btn-secondary">
-              &larr; Página Anterior
+              &larr; Anterior
             </button>
             <button id="auto-toggle-btn" class="btn btn-secondary">
-              ▶ Iniciar Auto-Passo
+              ▶ Auto-Passo
             </button>
             <button id="next-page-btn" class="btn">
-              Próxima Página &rarr;
+              Próxima &rarr;
             </button>
           </div>
         </div>
       </section>
 
-      <!-- RECEIVER SECTION -->
+      <!-- RECEIVER DEDICATED VIEW SECTION -->
       <section id="receiver-section" class="view-section">
-        <!-- Camera View Card -->
-        <div class="card">
-          <h2 class="card-title">Câmera do Receptor</h2>
-          <div class="scanner-wrapper">
+        <!-- Top Bar com Botão Voltar -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+          <button id="back-to-send-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem;">
+            &larr; Voltar para Transmissão
+          </button>
+          <span style="font-weight: 700; font-size: 1rem; color: var(--accent-primary);">Leitor de QR Code</span>
+        </div>
+
+        <!-- Camera View Card (Proporção 3:4) -->
+        <div class="card" style="padding: 0.75rem;">
+          <div class="scanner-wrapper-34">
             <video id="scanner-video" class="scanner-video" playsinline muted></video>
             <canvas id="scanner-overlay" class="scanner-overlay-canvas"></canvas>
           </div>
         </div>
 
         <!-- Reception Status Card -->
-        <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="card-title" style="margin-bottom: 0;">Progresso da Transferência</h2>
-            <div id="rx-file-info" style="font-size: 0.85rem; color: var(--text-muted);">Nenhum arquivo sendo lido</div>
+        <div class="card" style="margin-top: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+            <h2 class="card-title" style="margin-bottom: 0; font-size: 1rem;">Progresso</h2>
+            <div id="rx-file-info" style="font-size: 0.8rem; color: var(--text-muted); word-break: break-all;">Nenhum arquivo lido</div>
           </div>
 
           <div class="progress-bar-container">
@@ -142,15 +158,15 @@
           </div>
 
           <div id="rx-page-status-grid" class="page-status-grid">
-            <!-- Status badges da página atual renderizadas dinamicamente -->
+            <!-- Status badges da página atual -->
           </div>
 
-          <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-            <button id="download-file-btn" class="btn" style="flex: 1; display: none; justify-content: center; background: var(--accent-success);">
+          <div style="margin-top: 1.25rem; display: flex; gap: 0.75rem; flex-direction: column;">
+            <button id="download-file-btn" class="btn full-width-btn" style="display: none; justify-content: center; background: var(--accent-success);">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Baixar Arquivo Completo
             </button>
-            <button id="reset-rx-btn" class="btn btn-secondary">
+            <button id="reset-rx-btn" class="btn btn-secondary full-width-btn">
               Limpar / Reiniciar
             </button>
           </div>
@@ -161,7 +177,7 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-      <span>Projeto 100% Código Aberto</span>
+      <span style="text-align: center;">Projeto 100% Código Aberto</span>
       <a href="https://github.com/disoliveiradso/quick-transfer-pwa" target="_blank" rel="noopener noreferrer" class="github-link">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         Quick Transfer
