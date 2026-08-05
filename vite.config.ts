@@ -2,13 +2,13 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: '/quick-transfer-pwa/',
+  base: '/quick-transfer/',
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Quick Transfer Air-Gapped PWA',
+        name: 'Quick Transfer Air-Gapped',
         short_name: 'QuickTransfer',
         description: 'Transferência de arquivos offline via leitura visual de QR Codes estáticos',
         theme_color: '#0f172a',
