@@ -7,9 +7,10 @@ import { AudioFeedback } from './receiver/audioFeedback';
 import { getReceivedChunksCount, assembleFile, clearFile } from './db/storage';
 
 // ESTADO DA APLICAÇÃO - TRANSMISSOR
-let selectedFile: File | null = null;
+let selectedFiles: File[] = [];
 let allChunks: ChunkPayload[] = [];
-let currentChunkIndex: number = 0; // 0-based
+let currentChunkIndex: number = 0;
+let previewViewMode: 'list' | 'grid' = 'list'; // 0-based
 let txScanner: ScannerEngine = new ScannerEngine();
 
 // ESTADO DA APLICAÇÃO - RECEPTOR
@@ -36,11 +37,12 @@ const fullscreenToggleBtn = document.getElementById('fullscreen-toggle-btn') as 
 // PREVIEW UPLOAD
 const fileDropzone = document.getElementById('file-dropzone') as HTMLElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
-const filePreviewContainer = document.getElementById('file-preview-container') as HTMLElement;
-const previewMediaWrapper = document.getElementById('preview-media-wrapper') as HTMLElement;
-const previewFileIcon = document.getElementById('preview-file-icon') as HTMLElement;
-const previewFileName = document.getElementById('preview-file-name') as HTMLElement;
-const previewFileExt = document.getElementById('preview-file-ext') as HTMLElement;
+const filePreviewContainer = document.getElementById('file-preview-container') as HTMLDivElement;
+const fileListWrapper = document.getElementById('file-list-wrapper') as HTMLDivElement;
+const toggleViewBtn = document.getElementById('toggle-view-btn') as HTMLButtonElement;
+const viewIconList = document.getElementById('view-icon-list') as unknown as SVGElement;
+const viewIconGrid = document.getElementById('view-icon-grid') as unknown as SVGElement;
+
 const startTransferBtn = document.getElementById('start-transfer-btn') as HTMLButtonElement;
 const addAnotherFileBtn = document.getElementById('add-another-file-btn') as HTMLButtonElement;
 
@@ -99,7 +101,7 @@ function setupTabs() {
     const state = e.state;
     if (state) {
       if (state.tab === 'send') {
-        if (state.view === 'display' && selectedFile) {
+        if (state.view === 'display' && selectedFiles.length > 0) {
           showTransmitterDisplayView(false);
         } else {
           showTransmitterUploadView(false);
@@ -115,7 +117,7 @@ function setupTabs() {
   history.replaceState({ tab: 'send', view: 'upload' }, '');
 
   tabSendBtn.addEventListener('click', () => {
-    if (selectedFile && allChunks.length > 0) {
+    if (selectedFiles.length > 0 && allChunks.length > 0) {
       showTransmitterDisplayView(true);
     } else {
       showTransmitterUploadView(true);
@@ -205,111 +207,187 @@ function getFileIconSVG(type: string, ext: string): string {
   return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
 }
 
-function handleFileSelection(file: File) {
-  selectedFile = file;
-  const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  const type = file.type;
+function handleFilesSelection(files: FileList | File[]) {
+  if (!files || files.length === 0) return;
 
-  previewFileName.textContent = file.name;
-  previewFileExt.textContent = `${ext.toUpperCase()} • ${formatBytes(file.size)}`;
-  previewFileIcon.innerHTML = getFileIconSVG(type, ext);
-
-  previewMediaWrapper.innerHTML = '';
-  
-  let hasPreview = false;
-  if (type.startsWith('image/')) {
-    const img = document.createElement('img');
-    img.src = URL.createObjectURL(file);
-    img.style.maxWidth = '100%';
-    img.style.maxHeight = '250px';
-    img.style.objectFit = 'contain';
-    img.style.borderRadius = '8px';
-    previewMediaWrapper.appendChild(img);
-    hasPreview = true;
-  } else if (type.startsWith('video/')) {
-    const vid = document.createElement('video');
-    vid.src = URL.createObjectURL(file);
-    vid.controls = true;
-    vid.style.maxWidth = '100%';
-    vid.style.maxHeight = '250px';
-    vid.style.borderRadius = '8px';
-    previewMediaWrapper.appendChild(vid);
-    hasPreview = true;
-  } else if (type.startsWith('audio/')) {
-    const aud = document.createElement('audio');
-    aud.src = URL.createObjectURL(file);
-    aud.controls = true;
-    aud.style.width = '100%';
-    aud.style.marginTop = '1rem';
-    aud.style.marginBottom = '1rem';
-    previewMediaWrapper.appendChild(aud);
-    hasPreview = true;
+  for (let i = 0; i < files.length; i++) {
+    selectedFiles.push(files[i]);
   }
+  
+  renderFilesPreview();
+}
 
-  // Sempre mostra o preview container se tiver preview (imagem, video, audio)
-  previewMediaWrapper.style.display = hasPreview ? 'flex' : 'none';
-  filePreviewContainer.style.display = 'block';
+function renderFilesPreview() {
+  if (selectedFiles.length === 0) {
+    filePreviewContainer.style.display = 'none';
+    if (fileDropzone.parentElement) {
+      fileDropzone.parentElement.style.display = 'block';
+    }
+    return;
+  }
   
   if (fileDropzone.parentElement) {
     fileDropzone.parentElement.style.display = 'none';
   }
+  filePreviewContainer.style.display = 'block';
+  fileListWrapper.innerHTML = '';
+
+  if (previewViewMode === 'grid') {
+    fileListWrapper.style.flexDirection = 'row';
+    fileListWrapper.style.flexWrap = 'wrap';
+    fileListWrapper.style.justifyContent = 'center';
+  } else {
+    fileListWrapper.style.flexDirection = 'column';
+    fileListWrapper.style.flexWrap = 'nowrap';
+    fileListWrapper.style.justifyContent = 'flex-start';
+  }
+
+  selectedFiles.forEach((file, index) => {
+    const nameParts = file.name.split('.');
+    const ext = nameParts.length > 1 ? nameParts.pop()!.toLowerCase() : '';
+    const type = file.type;
+
+    const item = document.createElement('div');
+    if (previewViewMode === 'grid') {
+      item.style.cssText = 'display: flex; flex-direction: column; align-items: center; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center; width: 140px; gap: 0.5rem; position: relative;';
+      
+      const iconWrap = document.createElement('div');
+      iconWrap.innerHTML = getFileIconSVG(type, ext);
+      iconWrap.style.transform = 'scale(1.5)';
+      iconWrap.style.margin = '0.5rem 0';
+      iconWrap.style.color = 'var(--text-main)';
+      
+      const textWrap = document.createElement('div');
+      textWrap.style.fontSize = '0.85rem';
+      textWrap.style.fontWeight = '600';
+      textWrap.style.wordBreak = 'break-word';
+      textWrap.style.lineHeight = '1.2';
+      textWrap.style.maxHeight = '3em';
+      textWrap.style.overflow = 'hidden';
+      textWrap.textContent = file.name;
+      
+      const sizeText = document.createElement('div');
+      sizeText.style.fontSize = '0.75rem';
+      sizeText.style.color = 'var(--text-muted)';
+      sizeText.textContent = formatBytes(file.size);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+      removeBtn.style.cssText = 'position: absolute; top: 0.25rem; right: 0.25rem; background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem;';
+      removeBtn.onclick = () => removeFile(index);
+
+      item.appendChild(removeBtn);
+      item.appendChild(iconWrap);
+      item.appendChild(textWrap);
+      item.appendChild(sizeText);
+
+    } else {
+      item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); gap: 1rem;';
+      
+      const leftCol = document.createElement('div');
+      leftCol.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; overflow: hidden;';
+      
+      const iconWrap = document.createElement('div');
+      iconWrap.innerHTML = getFileIconSVG(type, ext);
+      iconWrap.style.color = 'var(--text-main)';
+      
+      const textWrap = document.createElement('div');
+      textWrap.style.display = 'flex';
+      textWrap.style.flexDirection = 'column';
+      textWrap.style.overflow = 'hidden';
+      
+      const title = document.createElement('span');
+      title.style.fontWeight = '600';
+      title.style.fontSize = '0.9rem';
+      title.style.whiteSpace = 'nowrap';
+      title.style.overflow = 'hidden';
+      title.style.textOverflow = 'ellipsis';
+      title.textContent = file.name;
+      
+      const subtitle = document.createElement('span');
+      subtitle.style.fontSize = '0.8rem';
+      subtitle.style.color = 'var(--text-muted)';
+      subtitle.textContent = `${ext.toUpperCase()} • ${formatBytes(file.size)}`;
+
+      textWrap.appendChild(title);
+      textWrap.appendChild(subtitle);
+      leftCol.appendChild(iconWrap);
+      leftCol.appendChild(textWrap);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'icon-btn';
+      removeBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+      removeBtn.style.color = '#ef4444';
+      removeBtn.style.padding = '0.4rem';
+      removeBtn.onclick = () => removeFile(index);
+
+      item.appendChild(leftCol);
+      item.appendChild(removeBtn);
+    }
+    
+    fileListWrapper.appendChild(item);
+  });
+}
+
+function removeFile(index: number) {
+  selectedFiles.splice(index, 1);
+  renderFilesPreview();
 }
 
 // -------------------------------------------------------------
 // TRANSMISSOR (OPTICAL HANDSHAKE)
 // -------------------------------------------------------------
 
-function clearSelectedFile() {
-  selectedFile = null;
-  fileInput.value = '';
-  filePreviewContainer.style.display = 'none';
-  if (fileDropzone.parentElement) {
-    fileDropzone.parentElement.style.display = 'block';
-  }
-}
-
 function setupTransmitterEvents() {
   fileDropzone.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', (e) => {
     const files = (e.target as HTMLInputElement).files;
-    if (files && files[0]) {
-      handleFileSelection(files[0]);
+    if (files) {
+      handleFilesSelection(files);
     }
   });
 
+  toggleViewBtn.addEventListener('click', () => {
+    previewViewMode = previewViewMode === 'list' ? 'grid' : 'list';
+    if (previewViewMode === 'grid') {
+      viewIconList.style.display = 'none';
+      viewIconGrid.style.display = 'block';
+    } else {
+      viewIconList.style.display = 'block';
+      viewIconGrid.style.display = 'none';
+    }
+    renderFilesPreview();
+  });
+
   startTransferBtn.addEventListener('click', () => {
-    if (selectedFile) {
+    if (selectedFiles.length > 0) {
       rebuildTransmission();
     }
   });
 
   addAnotherFileBtn.addEventListener('click', () => fileInput.click());
-
-  // Novo botão de exclusão
-  const removeFileBtn = document.getElementById('remove-file-btn') as HTMLButtonElement;
-  if (removeFileBtn) {
-    removeFileBtn.addEventListener('click', clearSelectedFile);
-  }
 }
 
 async function rebuildTransmission() {
-  if (!selectedFile) return;
+  if (selectedFiles.length === 0) return;
 
-  // Usa o novo sistema sem Grid, divide em densidade ultra-otimizada (max safe limit is ~1800 bytes due to Base64 expansion)
   const bytesPerQr = 1800; 
-  const { pages } = await chunkFileForGrid(selectedFile, bytesPerQr, 1);
+  allChunks = [];
+
+  for (const file of selectedFiles) {
+    const { pages } = await chunkFileForGrid(file, bytesPerQr, 1);
+    allChunks.push(...pages.flat());
+  }
   
-  // Como itemsPerPage é 1, achata as páginas
-  allChunks = pages.flat();
   currentChunkIndex = 0;
 
   showTransmitterDisplayView(true);
 }
 
 function startOpticalTransmitter() {
-  if (!selectedFile || allChunks.length === 0) return;
+  if (selectedFiles.length === 0 || allChunks.length === 0) return;
 
-  txFileInfo.textContent = `Enviando: ${selectedFile.name}`;
+  txFileInfo.textContent = selectedFiles.length > 1 ? `Enviando ${selectedFiles.length} arquivos...` : `Enviando: ${selectedFiles[0].name}`;
   txProgressFill.style.width = '0%';
   
   renderCurrentTxQR();
