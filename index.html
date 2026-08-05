@@ -9,8 +9,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-BhIhKAyz.js"></script>
-    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-CQ0qnrC_.css">
+    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-C9cpvsZK.js"></script>
+    <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-DG_miotg.css">
   <link rel="manifest" href="/quick-transfer-pwa/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer-pwa/registerSW.js"></script></head>
   <body>
     <!-- App Header -->
@@ -33,12 +33,18 @@
         </div>
         <div class="controls-grid" style="margin-top: 1rem;">
           <div class="control-group">
-            <label for="matrix-size-select">Tamanho da Matriz (Grid)</label>
-            <select id="matrix-size-select">
-              <option value="1x1">1x1 (1 QR Code por tela)</option>
-              <option value="2x2" selected>2x2 (4 QR Codes por tela)</option>
-              <option value="3x3">3x3 (9 QR Codes por tela)</option>
-            </select>
+            <label>Tamanho da Matriz (Grid)</label>
+            <div id="custom-matrix-select" class="custom-select-wrapper">
+              <div class="custom-select-trigger" tabIndex="0">
+                <span id="custom-select-value">2×2 (4 QR Codes por tela)</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="custom-select-options">
+                <div class="custom-option" data-value="1x1">1×1 (1 QR Code por tela)</div>
+                <div class="custom-option selected" data-value="2x2">2×2 (4 QR Codes por tela)</div>
+                <div class="custom-option" data-value="3x3">3×3 (9 QR Codes por tela)</div>
+              </div>
+            </div>
           </div>
           <div class="control-group">
             <label for="qr-density-input">Bytes por QR Code</label>
