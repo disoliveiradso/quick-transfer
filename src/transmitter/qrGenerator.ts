@@ -1,7 +1,7 @@
 import QRCode from 'qrcode';
 
 /**
- * Gera um Data URL/Canvas de QR Code em Nível L com alta densidade
+ * Gera um Data URL/Canvas de QR Code em Nível L com alta capacidade para SDPs
  */
 export async function renderQRCodeToCanvas(
   canvas: HTMLCanvasElement,
@@ -9,9 +9,9 @@ export async function renderQRCodeToCanvas(
 ): Promise<void> {
   try {
     await QRCode.toCanvas(canvas, data, {
-      errorCorrectionLevel: 'L', // Nível L para máxima capacidade de bytes útil (~7% redundância)
-      margin: 1,
-      scale: 6,
+      errorCorrectionLevel: 'L', // Nível L para máxima capacidade de bytes (até 2953 bytes no V40)
+      margin: 2,
+      scale: 3, // Menor escala para caber na tela
       color: {
         dark: '#000000',
         light: '#ffffff'
