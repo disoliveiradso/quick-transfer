@@ -23,6 +23,7 @@ let itemsPerPage: number = 4;
 let bytesPerQr: number = 2000;
 let autoTimerSec: number = 0;
 let autoTimerIntervalId: number | null = null;
+let currentQrZoomLevel: number = 1.0;
 
 // Estado de Configurações
 let userSettings: UserSettings = loadSettingsFromLocalStorage();
@@ -38,8 +39,16 @@ let completedPageToastTimeout: number | null = null;
 const tabSendBtn = document.getElementById('tab-send-btn') as HTMLButtonElement;
 const tabReceiveBtn = document.getElementById('tab-receive-btn') as HTMLButtonElement;
 const backToSendBtn = document.getElementById('back-to-send-btn') as HTMLButtonElement;
-const transmitterSection = document.getElementById('transmitter-section') as HTMLElement;
+const backToUploadBtn = document.getElementById('back-to-upload-btn') as HTMLButtonElement;
+
+const transmitterUploadSection = document.getElementById('transmitter-upload-section') as HTMLElement;
+const transmitterDisplaySection = document.getElementById('transmitter-display-section') as HTMLElement;
 const receiverSection = document.getElementById('receiver-section') as HTMLElement;
+
+// Controles de Tela Cheia e Zoom na Página Dedicada
+const zoomInBtn = document.getElementById('zoom-in-btn') as HTMLButtonElement;
+const zoomOutBtn = document.getElementById('zoom-out-btn') as HTMLButtonElement;
+const fullscreenToggleBtn = document.getElementById('fullscreen-toggle-btn') as HTMLButtonElement;
 
 // Modal & Configurações Elements
 const settingsToggleBtn = document.getElementById('settings-toggle-btn') as HTMLButtonElement;
@@ -65,7 +74,6 @@ const appDialogOkBtn = document.getElementById('app-dialog-ok-btn') as HTMLButto
 // Transmissor Elements
 const fileDropzone = document.getElementById('file-dropzone') as HTMLElement;
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
-const transmitterDisplayCard = document.getElementById('transmitter-display-card') as HTMLElement;
 const qrGridContainer = document.getElementById('qr-grid-container') as HTMLElement;
 const txFileInfo = document.getElementById('tx-file-info') as HTMLElement;
 const txPageIndicator = document.getElementById('tx-page-indicator') as HTMLElement;
@@ -92,6 +100,7 @@ function init() {
   setupCustomSelect();
   setupAppDialogModal();
   setupTransmitterEvents();
+  setupDisplayControls();
   syncUIWithSettings();
 }
 
@@ -140,7 +149,6 @@ function syncUIWithSettings() {
     qrDensityInput.value = userSettings.bytesPerQr.toString();
     autoTimerInput.value = userSettings.autoTimerSec.toString();
   } else {
-    // No modo automático, exibe 'Selecione...' no dropdown e deixa os inputs limpos mostrando o placeholder de instrução
     updateCustomSelectUI(null);
     qrDensityInput.value = '';
     autoTimerInput.value = '';
@@ -217,7 +225,7 @@ function setupSettingsModal() {
     };
     saveSettingsToLocalStorage(userSettings);
     settingsModal.style.display = 'none';
-    rebuildTransmission();
+    if (selectedFile) rebuildTransmission();
   });
 
   resetAutoSettingsBtn.addEventListener('click', () => {
@@ -230,16 +238,25 @@ function setupSettingsModal() {
     saveSettingsToLocalStorage(userSettings);
     syncUIWithSettings();
     settingsModal.style.display = 'none';
-    rebuildTransmission();
+    if (selectedFile) rebuildTransmission();
   });
 }
 
-// Alternância de Abas e Navegação Dedicada do Receptor
+// Alternância de Abas e Navegação Entre Páginas Dedicadas
 function setupTabs() {
   tabSendBtn.addEventListener('click', () => switchTab('send'));
   tabReceiveBtn.addEventListener('click', () => switchTab('receive'));
+
   if (backToSendBtn) {
     backToSendBtn.addEventListener('click', () => switchTab('send'));
+  }
+
+  if (backToUploadBtn) {
+    backToUploadBtn.addEventListener('click', () => {
+      transmitterDisplaySection.classList.remove('active');
+      transmitterUploadSection.classList.add('active');
+      stopAutoTimer();
+    });
   }
 }
 
@@ -247,17 +264,54 @@ function switchTab(tab: 'send' | 'receive') {
   if (tab === 'send') {
     tabSendBtn.classList.add('active');
     tabReceiveBtn.classList.remove('active');
-    transmitterSection.classList.add('active');
+
+    // Se já tiver um arquivo carregado, vai direto para a página dedicada dos QR Codes
+    if (selectedFile && currentPages.length > 0) {
+      transmitterDisplaySection.classList.add('active');
+      transmitterUploadSection.classList.remove('active');
+    } else {
+      transmitterUploadSection.classList.add('active');
+      transmitterDisplaySection.classList.remove('active');
+    }
+
     receiverSection.classList.remove('active');
     scanner.stop();
   } else {
     tabReceiveBtn.classList.add('active');
     tabSendBtn.classList.remove('active');
     receiverSection.classList.add('active');
-    transmitterSection.classList.remove('active');
+
+    transmitterUploadSection.classList.remove('active');
+    transmitterDisplaySection.classList.remove('active');
+
     stopAutoTimer();
     startReceiverScanner();
   }
+}
+
+// Controles da Página Dedicada (Zoom & Tela Cheia)
+function setupDisplayControls() {
+  zoomInBtn.addEventListener('click', () => {
+    if (currentQrZoomLevel < 1.6) {
+      currentQrZoomLevel += 0.15;
+      qrGridContainer.style.transform = `scale(${currentQrZoomLevel})`;
+    }
+  });
+
+  zoomOutBtn.addEventListener('click', () => {
+    if (currentQrZoomLevel > 0.6) {
+      currentQrZoomLevel -= 0.15;
+      qrGridContainer.style.transform = `scale(${currentQrZoomLevel})`;
+    }
+  });
+
+  fullscreenToggleBtn.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      transmitterDisplaySection.requestFullscreen?.().catch(_ => {});
+    } else {
+      document.exitFullscreen?.().catch(_ => {});
+    }
+  });
 }
 
 // LÓGICA DO TRANSMISSOR
@@ -296,9 +350,9 @@ function setupTransmitterEvents() {
 
 /**
  * Ajusta automaticamente o tamanho da matriz (Grid) e a densidade com base na quantidade total de QR Codes necessários.
- * Regra Automática:
- * - Se precisar de <= 6 QRs no total: exibe TODOS juntos na mesma página (ex: 2 QRs, 3 QRs, 4 QRs, 5 QRs ou 6 QRs).
- * - Se precisar de > 6 QRs no total: divide em páginas com no máximo 6 QRs por página (ex: 8 QRs ➔ 1ª página com 6 QRs + 2ª página com 2 QRs).
+ * Regra Automática Atualizada:
+ * - Se precisar de <= 4 QRs no total: exibe TODOS juntos na mesma página (ex: 2 QRs, 3 QRs ou 4 QRs).
+ * - Se precisar de > 4 QRs no total: divide em pares/páginas com no máximo 4 QRs por página (ex: 6 QRs ➔ 1ª página com 4 QRs + 2ª página com 2 QRs).
  */
 function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; itemsPerPage: number; bytes: number } {
   if (userSettings.isCustom) {
@@ -312,23 +366,24 @@ function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | 
     };
   }
 
-  // No modo automático, usa 2000 bytes por QR para garantir alta velocidade de leitura no WASM
+  // No modo automático, usa 2000 bytes por QR para garantir leitura ultra estável
   const bytes = 2000;
   const totalChunksNeeded = Math.ceil(fileSize / bytes);
 
-  let itemsPerPage = 6;
-  let matrixStr: '1x1' | '2x2' | '3x3' = '3x3';
+  let itemsPerPage = 4;
+  let matrixStr: '1x1' | '2x2' | '3x3' = '2x2';
 
   if (totalChunksNeeded <= 1) {
     itemsPerPage = 1;
     matrixStr = '1x1';
   } else if (totalChunksNeeded <= 4) {
-    itemsPerPage = totalChunksNeeded; // Se precisar de 2, 3 ou 4 QRs, coloca TODOS na mesma página!
-    matrixStr = totalChunksNeeded <= 2 ? '2x2' : '2x2';
+    // Se precisar de 2, 3 ou 4 QRs, coloca TODOS na mesma página para leitura simultânea!
+    itemsPerPage = totalChunksNeeded;
+    matrixStr = '2x2';
   } else {
-    // 5, 6 ou mais QRs ➔ usa blocos de no máximo 6 por página
-    itemsPerPage = 6;
-    matrixStr = '3x3';
+    // Mais de 4 QRs ➔ usa páginas em blocos de 4 por página (ex: 6 QRs = 4 + 2)
+    itemsPerPage = 4;
+    matrixStr = '2x2';
   }
 
   return { matrixStr, itemsPerPage, bytes };
@@ -337,7 +392,9 @@ function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | 
 async function rebuildTransmission() {
   if (!selectedFile) return;
   
-  transmitterDisplayCard.style.display = 'flex';
+  // Abre a Página Dedicada de Exibição dos QR Codes
+  transmitterUploadSection.classList.remove('active');
+  transmitterDisplaySection.classList.add('active');
 
   const autoConfig = applyAutomaticSettings(selectedFile.size);
   itemsPerPage = autoConfig.itemsPerPage;
@@ -351,6 +408,7 @@ async function rebuildTransmission() {
   currentPageIndex = 0;
 
   txFileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)}) • Grid ${autoConfig.matrixStr} (${totalChunks} QRs em ${pages.length} pág${pages.length > 1 ? 's' : ''})`;
+  
   renderCurrentTransmitterPage();
 }
 
@@ -358,10 +416,26 @@ async function renderCurrentTransmitterPage() {
   if (!currentPages || currentPages.length === 0) return;
 
   const pageChunks = currentPages[currentPageIndex];
-  txPageIndicator.textContent = `Página ${currentPageIndex + 1} de ${currentPages.length}`;
+  const totalPages = currentPages.length;
+
+  txPageIndicator.textContent = `Página ${currentPageIndex + 1} de ${totalPages}`;
 
   prevPageBtn.disabled = currentPageIndex === 0;
-  nextPageBtn.disabled = currentPageIndex === currentPages.length - 1;
+  nextPageBtn.disabled = currentPageIndex === totalPages - 1;
+
+  // IMPORTANTE: O botão Auto-Passo SÓ fica ativo se houver mais de 1 página para passar!
+  if (totalPages <= 1) {
+    stopAutoTimer();
+    autoToggleBtn.disabled = true;
+    autoToggleBtn.style.opacity = '0.4';
+    autoToggleBtn.style.cursor = 'not-allowed';
+    autoToggleBtn.title = 'Apenas 1 página disponível';
+  } else {
+    autoToggleBtn.disabled = false;
+    autoToggleBtn.style.opacity = '1';
+    autoToggleBtn.style.cursor = 'pointer';
+    autoToggleBtn.title = '';
+  }
 
   qrGridContainer.innerHTML = '';
 
@@ -383,6 +457,8 @@ async function renderCurrentTransmitterPage() {
 }
 
 function startAutoTimer() {
+  if (currentPages.length <= 1) return; // Não ativa se só tiver 1 página
+
   const interval = (autoTimerSec > 0 ? autoTimerSec : 4) * 1000;
   autoToggleBtn.textContent = '⏸ Pausar Auto';
   autoToggleBtn.classList.add('btn-secondary');

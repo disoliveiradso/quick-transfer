@@ -239,12 +239,14 @@ input[type=number]:hover::-webkit-outer-spin-button {
   display: grid;
   gap: 1rem;
   width: 100%;
-  max-width: 600px;
+  max-width: 680px;
   margin: 0 auto;
   justify-content: center;
   background: #ffffff;
   padding: 1rem;
   border-radius: var(--radius-lg);
+  transform-origin: center top;
+  transition: transform 0.2s ease;
 }
 
 .qr-grid[data-matrix="1x1"] { grid-template-columns: 1fr; }
