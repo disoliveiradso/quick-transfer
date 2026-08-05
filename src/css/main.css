@@ -616,16 +616,16 @@ input[type=number]:hover::-webkit-outer-spin-button {
   box-sizing: border-box;
 }
 
-/* Scanner Wrapper na proporção 3:4 */
+/* Scanner Wrapper na proporção 1:1 Quadrada */
 .scanner-wrapper-34 {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: 320px;
   margin: 0 auto;
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #000;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 1 / 1;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 

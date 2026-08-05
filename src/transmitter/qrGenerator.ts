@@ -9,9 +9,9 @@ export async function renderQRCodeToCanvas(
 ): Promise<void> {
   try {
     await QRCode.toCanvas(canvas, data, {
-      errorCorrectionLevel: 'L', // Nível L para máxima capacidade de bytes (até 2953 bytes no V40)
+      errorCorrectionLevel: 'M',
       margin: 2,
-      scale: 3, // Menor escala para caber na tela
+      width: 280,
       color: {
         dark: '#000000',
         light: '#ffffff'

@@ -51,6 +51,8 @@ const scannerBackBtn = document.getElementById('scanner-back-btn') as HTMLButton
 const scannerInstruction = document.getElementById('scanner-instruction') as HTMLElement;
 const manualCodeInput = document.getElementById('manual-code-input') as HTMLInputElement;
 const connectCodeBtn = document.getElementById('connect-code-btn') as HTMLButtonElement;
+const openCameraBtn = document.getElementById('open-camera-btn') as HTMLButtonElement;
+const cameraPreviewWrapper = document.getElementById('camera-preview-wrapper') as HTMLElement;
 
 // QR Display (Receptor)
 const qrCanvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
@@ -240,6 +242,12 @@ function init() {
     sendMoreFileInput.value = '';
   });
 
+  openCameraBtn.addEventListener('click', () => {
+    cameraPreviewWrapper.style.display = 'flex';
+    openCameraBtn.style.display = 'none';
+    startCameraScanner();
+  });
+
   // Botões de cancelamento e desconexão explícita
   disconnectBtn.addEventListener('click', () => {
     if (webrtcManager) {
@@ -249,8 +257,8 @@ function init() {
     cleanupAndGoHome();
   });
   
-  scannerBackBtn.addEventListener('click', cleanupAndGoHome);
-  qrBackBtn.addEventListener('click', cleanupAndGoHome);
+  scannerBackBtn.addEventListener('click', cancelAndGoHome);
+  qrBackBtn.addEventListener('click', cancelAndGoHome);
 }
 
 /**
@@ -356,9 +364,13 @@ function listenForOfferOnSupabase(sessionId: string) {
 function startSenderFlow() {
   currentRole = 'sender';
   showView(scannerSection);
-  scannerInstruction.textContent = "Aponte a câmera para o QR Code exibido no Receptor.";
   manualCodeInput.value = '';
+  cameraPreviewWrapper.style.display = 'none';
+  openCameraBtn.style.display = 'block';
+  scannerInstruction.textContent = "Aponte a câmera para o QR Code exibido no Receptor.";
+}
 
+function startCameraScanner() {
   if (!scanner) scanner = new ScannerEngine();
   scanner.onDataDecoded = (results) => {
     const data = results[0];
@@ -369,7 +381,7 @@ function startSenderFlow() {
     }
   };
   scanner.start(scannerVideo).catch(() => {
-    scannerInstruction.textContent = "Câmera indisponível. Utilize o código de conexão abaixo:";
+    scannerInstruction.textContent = "Câmera indisponível. Utilize o código de conexão acima.";
   });
 }
 
@@ -577,6 +589,37 @@ function showView(section: HTMLElement) {
   qrDisplaySection.classList.remove('active');
   transferSection.classList.remove('active');
   section.classList.add('active');
+}
+
+/**
+ * Cancelar fluxo e voltar para a Home MANTENDO os arquivos e texto selecionados
+ */
+function cancelAndGoHome() {
+  stopSupabaseListening();
+
+  if (scanner) {
+    try { scanner.stop(); } catch (e) {}
+  }
+
+  if (webrtcManager) {
+    try { webrtcManager.destroy(); } catch (e) {}
+    webrtcManager = null;
+  }
+
+  if (currentSessionId) {
+    deleteSessionRecord(currentSessionId);
+    currentSessionId = null;
+  }
+
+  currentRole = null;
+  isConnectionEstablished = false;
+
+  updateFileListUI();
+  if (textInput.value.trim().length > 0) {
+    sendTextBtn.style.display = 'block';
+  }
+
+  showView(homeSection);
 }
 
 /**
