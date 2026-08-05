@@ -94,13 +94,28 @@ self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
         } catch (_) {}
       }
 
+      // 2. Fallback para zxing-wasm leve se BarcodeDetector falhar ou não achar nada
+      if (qrCount === 0) {
+        try {
+          const { readBarcodesFromImageData } = await import('zxing-wasm/reader');
+          const wasmResults = await readBarcodesFromImageData(msg.imageData, {
+            formats: ['QRCode'],
+            tryHarder: false, // modo rápido
+            maxNumberOfSymbols: 4
+          });
+          if (wasmResults) {
+            qrCount = wasmResults.length;
+          }
+        } catch (_) {}
+      }
+
       // Se detectou mais de 1 QR Code na visão ao vivo
       if (qrCount > 1) {
         // Verifica a nitidez/foco da imagem usando variância Laplaciana
         const sharpness = computeBlurSharpnessScore(msg.imageData);
 
-        // Se a nitidez estiver boa (> 100 indica imagem limpa sem borrão de movimento)
-        if (sharpness > 100) {
+        // Se a nitidez estiver razoável (> 30 indica imagem não totalmente borrada)
+        if (sharpness > 30) {
           self.postMessage({
             type: 'MULTI_QR_DETECTED_AUTO_TRIGGER',
             count: qrCount

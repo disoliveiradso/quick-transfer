@@ -249,48 +249,96 @@ function setupSettingsModal() {
 
 // Alternância de Abas e Navegação Entre Páginas Dedicadas
 function setupTabs() {
-  tabSendBtn.addEventListener('click', () => switchTab('send'));
-  tabReceiveBtn.addEventListener('click', () => switchTab('receive'));
+  window.addEventListener('popstate', (e) => {
+    const state = e.state;
+    if (state) {
+      if (state.tab === 'send') {
+        if (state.view === 'display' && selectedFile) {
+          showTransmitterDisplayView(false);
+        } else {
+          showTransmitterUploadView(false);
+        }
+      } else if (state.tab === 'receive') {
+        showReceiverView(false);
+      }
+    } else {
+      // Estado inicial padrão
+      showTransmitterUploadView(false);
+    }
+  });
+
+  // Salva o estado inicial
+  history.replaceState({ tab: 'send', view: 'upload' }, '');
+
+  tabSendBtn.addEventListener('click', () => {
+    if (selectedFile && currentPages.length > 0) {
+      showTransmitterDisplayView(true);
+    } else {
+      showTransmitterUploadView(true);
+    }
+  });
+  
+  tabReceiveBtn.addEventListener('click', () => showReceiverView(true));
 
   if (backToSendBtn) {
-    backToSendBtn.addEventListener('click', () => switchTab('send'));
+    backToSendBtn.addEventListener('click', () => {
+      if (selectedFile && currentPages.length > 0) {
+        showTransmitterDisplayView(true);
+      } else {
+        showTransmitterUploadView(true);
+      }
+    });
   }
 
   if (backToUploadBtn) {
-    backToUploadBtn.addEventListener('click', () => {
-      transmitterDisplaySection.classList.remove('active');
-      transmitterUploadSection.classList.add('active');
-      stopAutoTimer();
-    });
+    backToUploadBtn.addEventListener('click', () => showTransmitterUploadView(true));
   }
 }
 
-function switchTab(tab: 'send' | 'receive') {
-  if (tab === 'send') {
-    tabSendBtn.classList.add('active');
-    tabReceiveBtn.classList.remove('active');
+function showTransmitterUploadView(pushHistory: boolean) {
+  tabSendBtn.classList.add('active');
+  tabReceiveBtn.classList.remove('active');
+  
+  transmitterUploadSection.classList.add('active');
+  transmitterDisplaySection.classList.remove('active');
+  receiverSection.classList.remove('active');
+  
+  scanner.stop();
+  stopAutoTimer();
 
-    // Se já tiver um arquivo carregado, vai direto para a página dedicada dos QR Codes
-    if (selectedFile && currentPages.length > 0) {
-      transmitterDisplaySection.classList.add('active');
-      transmitterUploadSection.classList.remove('active');
-    } else {
-      transmitterUploadSection.classList.add('active');
-      transmitterDisplaySection.classList.remove('active');
-    }
+  if (pushHistory) {
+    history.pushState({ tab: 'send', view: 'upload' }, '');
+  }
+}
 
-    receiverSection.classList.remove('active');
-    scanner.stop();
-  } else {
-    tabReceiveBtn.classList.add('active');
-    tabSendBtn.classList.remove('active');
-    receiverSection.classList.add('active');
+function showTransmitterDisplayView(pushHistory: boolean) {
+  tabSendBtn.classList.add('active');
+  tabReceiveBtn.classList.remove('active');
+  
+  transmitterUploadSection.classList.remove('active');
+  transmitterDisplaySection.classList.add('active');
+  receiverSection.classList.remove('active');
+  
+  scanner.stop();
 
-    transmitterUploadSection.classList.remove('active');
-    transmitterDisplaySection.classList.remove('active');
+  if (pushHistory) {
+    history.pushState({ tab: 'send', view: 'display' }, '');
+  }
+}
 
-    stopAutoTimer();
-    startReceiverScanner();
+function showReceiverView(pushHistory: boolean) {
+  tabReceiveBtn.classList.add('active');
+  tabSendBtn.classList.remove('active');
+  
+  receiverSection.classList.add('active');
+  transmitterUploadSection.classList.remove('active');
+  transmitterDisplaySection.classList.remove('active');
+  
+  stopAutoTimer();
+  startReceiverScanner();
+
+  if (pushHistory) {
+    history.pushState({ tab: 'receive' }, '');
   }
 }
 
@@ -397,9 +445,8 @@ function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | 
 async function rebuildTransmission() {
   if (!selectedFile) return;
   
-  // Abre a Página Dedicada de Exibição dos QR Codes
-  transmitterUploadSection.classList.remove('active');
-  transmitterDisplaySection.classList.add('active');
+  // Abre a Página Dedicada de Exibição dos QR Codes e atualiza histórico
+  showTransmitterDisplayView(true);
 
   const autoConfig = applyAutomaticSettings(selectedFile.size);
   itemsPerPage = autoConfig.itemsPerPage;
@@ -538,6 +585,15 @@ function resetPhotoStateToLiveCamera() {
 
   capturePhotoBtn.style.display = 'inline-flex';
   retakePhotoBtn.style.display = 'none';
+
+  // Limpa o overlay de checks verdes
+  const ctx = scannerOverlay.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
+  }
+  
+  // Limpa a leitura da página atual (opcionalmente) para que o usuário possa escanear a página do zero se estava dando erro
+  activeScannedChunksInPage.clear();
 }
 
 // LÓGICA DO RECEPTOR
