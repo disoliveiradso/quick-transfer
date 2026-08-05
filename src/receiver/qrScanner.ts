@@ -19,6 +19,42 @@ export class ScannerEngine {
     this.offscreenCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: true });
   }
 
+  public captureSnapshot(snapshotCanvas: HTMLCanvasElement): ImageData | null {
+    if (!this.videoElement || this.videoElement.readyState < this.videoElement.HAVE_CURRENT_DATA || !this.offscreenCtx) {
+      return null;
+    }
+
+    const width = this.videoElement.videoWidth || 640;
+    const height = this.videoElement.videoHeight || 480;
+
+    snapshotCanvas.width = width;
+    snapshotCanvas.height = height;
+
+    const snapCtx = snapshotCanvas.getContext('2d');
+    if (snapCtx) {
+      snapCtx.drawImage(this.videoElement, 0, 0, width, height);
+    }
+
+    if (this.offscreenCanvas.width !== width || this.offscreenCanvas.height !== height) {
+      this.offscreenCanvas.width = width;
+      this.offscreenCanvas.height = height;
+    }
+
+    this.offscreenCtx.drawImage(this.videoElement, 0, 0, width, height);
+    return this.offscreenCtx.getImageData(0, 0, width, height);
+  }
+
+  public processSnapshotImageData(imageData: ImageData) {
+    if (this.worker) {
+      this.isWorkerProcessingFrame = true;
+      this.worker.postMessage({
+        type: 'SCAN_FRAME',
+        imageData,
+        maxSymbols: 9
+      } as WorkerInputMessage);
+    }
+  }
+
   public async start(
     videoEl: HTMLVideoElement,
     deviceId?: string

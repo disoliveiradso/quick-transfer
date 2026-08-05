@@ -318,31 +318,55 @@ input[type=number]:hover::-webkit-outer-spin-button {
   background: rgba(255, 255, 255, 0.05);
 }
 
-/* Camera Scanner Container */
-.scanner-wrapper {
+/* Scanner Wrapper (Proporção 3:4 Dedicada) com Suporte a Foto & Scanline */
+.scanner-wrapper-34 {
   position: relative;
   width: 100%;
-  max-width: 640px;
+  max-width: 480px;
   margin: 0 auto;
+  aspect-ratio: 3 / 4;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #000;
-  aspect-ratio: 4 / 3;
+  background: #000000;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
 
-.scanner-video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.scanner-overlay-canvas {
+.scanner-wrapper-34 video,
+.scanner-wrapper-34 canvas {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  object-fit: cover;
+}
+
+/* Animação Laser de Varredura da Foto (Scanline) */
+.scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%);
+  box-shadow: 0 0 15px #10b981, 0 0 30px #10b981;
+  z-index: 15;
+  animation: scanlineMove 2s ease-in-out infinite alternate;
+}
+
+@keyframes scanlineMove {
+  0% {
+    top: 5%;
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    top: 92%;
+    opacity: 0.8;
+  }
 }
 
 /* Progress & Status Card */

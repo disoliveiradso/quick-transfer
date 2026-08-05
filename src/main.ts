@@ -81,9 +81,13 @@ const prevPageBtn = document.getElementById('prev-page-btn') as HTMLButtonElemen
 const nextPageBtn = document.getElementById('next-page-btn') as HTMLButtonElement;
 const autoToggleBtn = document.getElementById('auto-toggle-btn') as HTMLButtonElement;
 
-// Receptor Elements
+// Receptor Elements & Foto Snapshot
 const scannerVideo = document.getElementById('scanner-video') as HTMLVideoElement;
 const scannerOverlay = document.getElementById('scanner-overlay') as HTMLCanvasElement;
+const capturedSnapshotCanvas = document.getElementById('captured-snapshot-canvas') as HTMLCanvasElement;
+const scanlineAnim = document.getElementById('scanline-anim') as HTMLElement;
+const capturePhotoBtn = document.getElementById('capture-photo-btn') as HTMLButtonElement;
+const retakePhotoBtn = document.getElementById('retake-photo-btn') as HTMLButtonElement;
 const rxFileInfo = document.getElementById('rx-file-info') as HTMLElement;
 const rxProgressFill = document.getElementById('rx-progress-fill') as HTMLElement;
 const rxProgressText = document.getElementById('rx-progress-text') as HTMLElement;
@@ -101,6 +105,7 @@ function init() {
   setupAppDialogModal();
   setupTransmitterEvents();
   setupDisplayControls();
+  setupReceiverPhotoEvents();
   syncUIWithSettings();
 }
 
@@ -480,6 +485,59 @@ function stopAutoTimer() {
   }
   autoToggleBtn.textContent = '▶ Auto-Passo';
   autoToggleBtn.classList.remove('btn-secondary');
+}
+
+let isPhotoCapturedState = false;
+let capturedImageData: ImageData | null = null;
+let scanlineLoopInterval: number | null = null;
+
+function setupReceiverPhotoEvents() {
+  capturePhotoBtn.addEventListener('click', () => {
+    capturedImageData = scanner.captureSnapshot(capturedSnapshotCanvas);
+    if (capturedImageData) {
+      isPhotoCapturedState = true;
+
+      // Oculta vídeo da câmera e exibe a foto congelada na tela
+      scannerVideo.style.display = 'none';
+      capturedSnapshotCanvas.style.display = 'block';
+
+      // Ativa animação laser de varredura (Scanline)
+      scanlineAnim.style.display = 'block';
+
+      // Alterna botões
+      capturePhotoBtn.style.display = 'none';
+      retakePhotoBtn.style.display = 'inline-flex';
+
+      // Envia o frame estático para o Web Worker varrer e decodificar todos os QRs simultaneamente
+      runPhotoScanIteration();
+      scanlineLoopInterval = window.setInterval(runPhotoScanIteration, 1200);
+    }
+  });
+
+  retakePhotoBtn.addEventListener('click', resetPhotoStateToLiveCamera);
+}
+
+function runPhotoScanIteration() {
+  if (isPhotoCapturedState && capturedImageData) {
+    scanner.processSnapshotImageData(capturedImageData);
+  }
+}
+
+function resetPhotoStateToLiveCamera() {
+  isPhotoCapturedState = false;
+  capturedImageData = null;
+
+  if (scanlineLoopInterval) {
+    clearInterval(scanlineLoopInterval);
+    scanlineLoopInterval = null;
+  }
+
+  scannerVideo.style.display = 'block';
+  capturedSnapshotCanvas.style.display = 'none';
+  scanlineAnim.style.display = 'none';
+
+  capturePhotoBtn.style.display = 'inline-flex';
+  retakePhotoBtn.style.display = 'none';
 }
 
 // LÓGICA DO RECEPTOR
