@@ -127,21 +127,38 @@ export class ScannerEngine {
     }
   }
 
+  private lastScanTime: number = 0;
+
   private scanLoop = () => {
     if (!this.isScanning || !this.videoElement || !this.worker) return;
 
-    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx) {
-      if (!this.isWorkerProcessingFrame) {
-        const width = this.videoElement.videoWidth || 640;
-        const height = this.videoElement.videoHeight || 480;
+    const now = performance.now();
 
-        if (this.offscreenCanvas.width !== width || this.offscreenCanvas.height !== height) {
-          this.offscreenCanvas.width = width;
-          this.offscreenCanvas.height = height;
+    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx) {
+      // Throttling inteligente: Limita o envio de frames para processamento no Worker a cada ~180ms (aprox 5 FPS de varredura), liberando a UI para rodar cravada a 60 FPS!
+      if (!this.isWorkerProcessingFrame && now - this.lastScanTime >= 180) {
+        this.lastScanTime = now;
+
+        const videoW = this.videoElement.videoWidth || 640;
+        const videoH = this.videoElement.videoHeight || 480;
+
+        // Otimização de Resolução Offscreen (max 960px de largura mantendo a proporção) para leitura veloz
+        const maxDim = 960;
+        let targetW = videoW;
+        let targetH = videoH;
+
+        if (videoW > maxDim) {
+          targetW = maxDim;
+          targetH = Math.round((videoH * maxDim) / videoW);
         }
 
-        this.offscreenCtx.drawImage(this.videoElement, 0, 0, width, height);
-        const imageData = this.offscreenCtx.getImageData(0, 0, width, height);
+        if (this.offscreenCanvas.width !== targetW || this.offscreenCanvas.height !== targetH) {
+          this.offscreenCanvas.width = targetW;
+          this.offscreenCanvas.height = targetH;
+        }
+
+        this.offscreenCtx.drawImage(this.videoElement, 0, 0, targetW, targetH);
+        const imageData = this.offscreenCtx.getImageData(0, 0, targetW, targetH);
 
         this.isWorkerProcessingFrame = true;
         this.worker.postMessage({
