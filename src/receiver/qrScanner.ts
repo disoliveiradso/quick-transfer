@@ -26,7 +26,7 @@ export class ScannerEngine {
     this.videoElement = videoEl;
     this.isScanning = true;
 
-    // Inicializa o Web Worker dedicado sem travar a UI
+    // Inicializa o Web Worker dedicado
     this.worker = new Worker(new URL('./qrScanner.worker.ts', import.meta.url), { type: 'module' });
 
     this.worker.onmessage = async (e: MessageEvent<WorkerOutputMessage>) => {
@@ -53,19 +53,23 @@ export class ScannerEngine {
       }
     };
 
-    // Solicita inicialização do WASM dentro do Worker
-    this.worker.postMessage({ type: 'INIT' } as WorkerInputMessage);
-
-    // Solicita câmera em resolução Full HD (1920x1080)
+    // Solicita câmera
     const constraints: MediaStreamConstraints = {
       video: deviceId
         ? { deviceId: { exact: deviceId } }
         : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
     };
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    this.videoElement.srcObject = stream;
-    await this.videoElement.play();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.videoElement.srcObject = stream;
+      await this.videoElement.play();
+    } catch (_) {
+      // Fallback para câmera padrão sem resolução ideal caso falhe no dispositivo
+      const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      this.videoElement.srcObject = fallbackStream;
+      await this.videoElement.play();
+    }
 
     this.scanLoop();
   }
@@ -90,10 +94,10 @@ export class ScannerEngine {
   private scanLoop = () => {
     if (!this.isScanning || !this.videoElement || !this.worker) return;
 
-    if (this.videoElement.readyState === this.videoElement.HAVE_ENOUGH_DATA && this.offscreenCtx) {
+    if (this.videoElement.readyState >= this.videoElement.HAVE_CURRENT_DATA && this.offscreenCtx) {
       if (!this.isWorkerProcessingFrame) {
-        const width = this.videoElement.videoWidth;
-        const height = this.videoElement.videoHeight;
+        const width = this.videoElement.videoWidth || 640;
+        const height = this.videoElement.videoHeight || 480;
 
         if (this.offscreenCanvas.width !== width || this.offscreenCanvas.height !== height) {
           this.offscreenCanvas.width = width;
@@ -104,7 +108,6 @@ export class ScannerEngine {
         const imageData = this.offscreenCtx.getImageData(0, 0, width, height);
 
         this.isWorkerProcessingFrame = true;
-        // Envia o frame capturado para o Web Worker processar
         this.worker.postMessage({
           type: 'SCAN_FRAME',
           imageData,

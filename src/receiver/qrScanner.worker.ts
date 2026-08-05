@@ -1,4 +1,4 @@
-import { getZXingModule, readBarcodesFromImageData } from 'zxing-wasm/reader';
+import { readBarcodesFromImageData } from 'zxing-wasm/reader';
 import { unpackChunkString } from '../transmitter/chunker';
 import type { FileChunkHeader } from '../transmitter/chunker';
 
@@ -14,48 +14,27 @@ export interface ScannedQRInfo {
   timestamp: number;
 }
 
-// Mensagens trocadas com a Thread Principal
 export type WorkerInputMessage = {
-  type: 'INIT';
-} | {
   type: 'SCAN_FRAME';
   imageData: ImageData;
   maxSymbols: number;
 };
 
 export type WorkerOutputMessage = {
-  type: 'INIT_DONE';
-} | {
   type: 'QRS_DETECTED';
   results: ScannedQRInfo[];
 } | {
-  type: 'ERROR';
-  error: string;
+  type: 'DONE_SCANNING';
 };
-
-let isWasmReady = false;
 
 self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
   const msg = e.data;
 
-  if (msg.type === 'INIT') {
-    try {
-      await getZXingModule();
-      isWasmReady = true;
-      self.postMessage({ type: 'INIT_DONE' } as WorkerOutputMessage);
-    } catch (err: unknown) {
-      self.postMessage({ type: 'ERROR', error: String(err) } as WorkerOutputMessage);
-    }
-    return;
-  }
-
   if (msg.type === 'SCAN_FRAME') {
-    if (!isWasmReady) return;
-
     try {
-      // Tenta decodificar usando BarcodeDetector nativo com aceleração por hardware se disponível na Worker Thread
       let barcodes: Array<{ text?: string; bytes?: Uint8Array; position: ScannedQRInfo['position'] }> = [];
 
+      // 1. Tenta API Nativa BarcodeDetector se disponível
       if ('BarcodeDetector' in self) {
         try {
           const detector = new (self as unknown as { BarcodeDetector: new (opts: { formats: string[] }) => { detect: (data: ImageData) => Promise<Array<{ rawValue: string; cornerPoints: Array<{ x: number; y: number }> }>> } })
@@ -73,12 +52,10 @@ self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
               }
             }));
           }
-        } catch (_) {
-          // Fallback para zxing-wasm
-        }
+        } catch (_) {}
       }
 
-      // Se a API nativa não retornou barcodes ou não está disponível, utiliza zxing-wasm
+      // 2. Fallback / Complemento ZXing-WASM
       if (barcodes.length === 0) {
         const wasmResults = await readBarcodesFromImageData(msg.imageData, {
           formats: ['QRCode'],
@@ -100,8 +77,10 @@ self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
         for (const barcode of barcodes) {
           let textData = barcode.text || '';
           if (!textData && barcode.bytes && barcode.bytes.length > 0) {
-            const textDecoder = new TextDecoder();
-            textData = textDecoder.decode(barcode.bytes);
+            try {
+              const textDecoder = new TextDecoder('utf-8');
+              textData = textDecoder.decode(barcode.bytes);
+            } catch (_) {}
           }
 
           if (!textData) continue;
@@ -122,10 +101,13 @@ self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
             type: 'QRS_DETECTED',
             results: detectedList
           } as WorkerOutputMessage);
+          return;
         }
       }
-    } catch (_) {
-      // Ignora erros ocasionais em frames sem QR Code
+    } catch (err) {
+      // Catch e continua
     }
+
+    self.postMessage({ type: 'DONE_SCANNING' } as WorkerOutputMessage);
   }
 };
