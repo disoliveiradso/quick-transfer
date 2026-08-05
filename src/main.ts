@@ -444,7 +444,7 @@ async function renderCurrentTransmitterPage() {
     itemEl.className = 'qr-item';
 
     const canvas = document.createElement('canvas');
-    await renderQRCodeToCanvas(canvas, chunk.dataBase64);
+    await renderQRCodeToCanvas(canvas, chunk.qrSegmentData);
 
     const label = document.createElement('div');
     label.className = 'qr-label';
@@ -567,8 +567,20 @@ function drawOverlayFeedbacks(results: ScannedQRInfo[]) {
   const ctx = scannerOverlay.getContext('2d');
   if (!ctx || !scannerVideo) return;
 
-  scannerOverlay.width = scannerVideo.videoWidth || 480;
-  scannerOverlay.height = scannerVideo.videoHeight || 640;
+  const displayWidth = scannerVideo.clientWidth || 480;
+  const displayHeight = scannerVideo.clientHeight || 640;
+
+  if (scannerOverlay.width !== displayWidth || scannerOverlay.height !== displayHeight) {
+    scannerOverlay.width = displayWidth;
+    scannerOverlay.height = displayHeight;
+  }
+
+  const nativeWidth = scannerVideo.videoWidth || displayWidth;
+  const nativeHeight = scannerVideo.videoHeight || displayHeight;
+
+  // Fatores de escala entre a resolução nativa do vídeo (ex: 1920x1080) e o tamanho renderizado na tela
+  const scaleX = displayWidth / nativeWidth;
+  const scaleY = displayHeight / nativeHeight;
 
   ctx.clearRect(0, 0, scannerOverlay.width, scannerOverlay.height);
 
@@ -576,27 +588,33 @@ function drawOverlayFeedbacks(results: ScannedQRInfo[]) {
     if (res.position) {
       const { topLeft, topRight, bottomRight, bottomLeft } = res.position;
 
-      // Desenha o polígono delimitador sobre o QR Code lido
+      // Converte coordenadas da resolução nativa para as coordenadas da tela
+      const pTopLeft = { x: topLeft.x * scaleX, y: topLeft.y * scaleY };
+      const pTopRight = { x: topRight.x * scaleX, y: topRight.y * scaleY };
+      const pBottomRight = { x: bottomRight.x * scaleX, y: bottomRight.y * scaleY };
+      const pBottomLeft = { x: bottomLeft.x * scaleX, y: bottomLeft.y * scaleY };
+
+      // Desenha o polígono delimitador com escala ajustada
       ctx.strokeStyle = '#10b981';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(topLeft.x, topLeft.y);
-      ctx.lineTo(topRight.x, topRight.y);
-      ctx.lineTo(bottomRight.x, bottomRight.y);
-      ctx.lineTo(bottomLeft.x, bottomLeft.y);
+      ctx.moveTo(pTopLeft.x, pTopLeft.y);
+      ctx.lineTo(pTopRight.x, pTopRight.y);
+      ctx.lineTo(pBottomRight.x, pBottomRight.y);
+      ctx.lineTo(pBottomLeft.x, pBottomLeft.y);
       ctx.closePath();
       ctx.stroke();
 
       // Fundo semi-transparente verde no QR lido
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
       ctx.fill();
 
-      // Desenha o ícone de Check verde (✓) no centro do QR Code
-      const centerX = (topLeft.x + bottomRight.x) / 2;
-      const centerY = (topLeft.y + bottomRight.y) / 2;
+      // Desenha o ícone de Check verde (✓) no centro exato escalado
+      const centerX = (pTopLeft.x + pBottomRight.x) / 2;
+      const centerY = (pTopLeft.y + pBottomRight.y) / 2;
 
       ctx.fillStyle = '#10b981';
-      ctx.font = 'bold 26px Inter, sans-serif';
+      ctx.font = 'bold 28px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('✓', centerX, centerY);

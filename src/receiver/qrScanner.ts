@@ -1,19 +1,7 @@
-import { getZXingModule, readBarcodesFromImageData } from 'zxing-wasm/reader';
-import { unpackChunk } from '../transmitter/chunker';
-import type { FileChunkHeader } from '../transmitter/chunker';
 import { saveChunk } from '../db/storage';
+import type { ScannedQRInfo, WorkerInputMessage, WorkerOutputMessage } from './qrScanner.worker';
 
-export interface ScannedQRInfo {
-  header: FileChunkHeader;
-  dataBytes: Uint8Array;
-  position: {
-    topRight: { x: number; y: number };
-    topLeft: { x: number; y: number };
-    bottomRight: { x: number; y: number };
-    bottomLeft: { x: number; y: number };
-  };
-  timestamp: number;
-}
+export type { ScannedQRInfo };
 
 export class ScannerEngine {
   private isScanning: boolean = false;
@@ -21,6 +9,8 @@ export class ScannerEngine {
   private animationFrameId: number | null = null;
   private offscreenCanvas: HTMLCanvasElement;
   private offscreenCtx: CanvasRenderingContext2D | null;
+  private worker: Worker | null = null;
+  private isWorkerProcessingFrame: boolean = false;
 
   public onQRsDetected?: (results: ScannedQRInfo[]) => void;
 
@@ -36,13 +26,41 @@ export class ScannerEngine {
     this.videoElement = videoEl;
     this.isScanning = true;
 
-    // Pré-carrega o módulo WebAssembly do ZXing para leitura simultânea de múltiplos QR Codes
-    await getZXingModule();
+    // Inicializa o Web Worker dedicado sem travar a UI
+    this.worker = new Worker(new URL('./qrScanner.worker.ts', import.meta.url), { type: 'module' });
 
+    this.worker.onmessage = async (e: MessageEvent<WorkerOutputMessage>) => {
+      const msg = e.data;
+      this.isWorkerProcessingFrame = false;
+
+      if (msg.type === 'QRS_DETECTED' && msg.results.length > 0) {
+        for (const res of msg.results) {
+          // Salva no IndexedDB
+          await saveChunk({
+            fileId: res.header.fId,
+            chunkIndex: res.header.ci,
+            totalChunks: res.header.tc,
+            fileName: res.header.fn,
+            fileSize: res.header.fs,
+            fileType: res.header.ft,
+            data: res.dataBytes.buffer as ArrayBuffer
+          });
+        }
+
+        if (this.onQRsDetected) {
+          this.onQRsDetected(msg.results);
+        }
+      }
+    };
+
+    // Solicita inicialização do WASM dentro do Worker
+    this.worker.postMessage({ type: 'INIT' } as WorkerInputMessage);
+
+    // Solicita câmera em resolução Full HD (1920x1080)
     const constraints: MediaStreamConstraints = {
       video: deviceId
         ? { deviceId: { exact: deviceId } }
-        : { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
     };
 
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -58,6 +76,10 @@ export class ScannerEngine {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
     if (this.videoElement && this.videoElement.srcObject) {
       const stream = this.videoElement.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
@@ -65,11 +87,11 @@ export class ScannerEngine {
     }
   }
 
-  private scanLoop = async () => {
-    if (!this.isScanning || !this.videoElement) return;
+  private scanLoop = () => {
+    if (!this.isScanning || !this.videoElement || !this.worker) return;
 
     if (this.videoElement.readyState === this.videoElement.HAVE_ENOUGH_DATA && this.offscreenCtx) {
-      try {
+      if (!this.isWorkerProcessingFrame) {
         const width = this.videoElement.videoWidth;
         const height = this.videoElement.videoHeight;
 
@@ -78,60 +100,21 @@ export class ScannerEngine {
           this.offscreenCanvas.height = height;
         }
 
-        // Desenha o frame de vídeo no canvas oculto
         this.offscreenCtx.drawImage(this.videoElement, 0, 0, width, height);
         const imageData = this.offscreenCtx.getImageData(0, 0, width, height);
 
-        // Lê MÚLTIPLOS QR Codes SIMULTANEAMENTE via WebAssembly
-        const barcodes = await readBarcodesFromImageData(imageData, {
-          formats: ['QRCode'],
-          tryHarder: true,
-          maxNumberOfSymbols: 9 // Lê até 9 QR Codes simultâneos no mesmo frame (grade 3x3 inteira)
-        });
-
-        if (barcodes && barcodes.length > 0) {
-          const detectedList: ScannedQRInfo[] = [];
-
-          for (const barcode of barcodes) {
-            if (!barcode.text) continue;
-            const unpacked = unpackChunk(barcode.text);
-            if (!unpacked) continue;
-
-            const scannedInfo: ScannedQRInfo = {
-              header: unpacked.header,
-              dataBytes: unpacked.dataBytes,
-              position: barcode.position,
-              timestamp: Date.now()
-            };
-
-            // Salva no IndexedDB imediatamente
-            await saveChunk({
-              fileId: unpacked.header.fId,
-              chunkIndex: unpacked.header.ci,
-              totalChunks: unpacked.header.tc,
-              fileName: unpacked.header.fn,
-              fileSize: unpacked.header.fs,
-              fileType: unpacked.header.ft,
-              data: unpacked.dataBytes.buffer as ArrayBuffer
-            });
-
-            detectedList.push(scannedInfo);
-          }
-
-          if (detectedList.length > 0 && this.onQRsDetected) {
-            this.onQRsDetected(detectedList);
-          }
-        }
-      } catch (err) {
-        // Ignora erros ocasionais de frame
+        this.isWorkerProcessingFrame = true;
+        // Envia o frame capturado para o Web Worker processar
+        this.worker.postMessage({
+          type: 'SCAN_FRAME',
+          imageData,
+          maxSymbols: 9
+        } as WorkerInputMessage);
       }
     }
 
-    // Intervalo suave de captura para alto desempenho sem travar
-    setTimeout(() => {
-      if (this.isScanning) {
-        this.animationFrameId = requestAnimationFrame(this.scanLoop);
-      }
-    }, 100);
+    if (this.isScanning) {
+      this.animationFrameId = requestAnimationFrame(this.scanLoop);
+    }
   };
 }

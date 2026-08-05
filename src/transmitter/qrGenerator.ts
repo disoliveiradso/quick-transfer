@@ -1,15 +1,19 @@
 import QRCode from 'qrcode';
 
 /**
- * Gera um Data URL SVG/PNG de QR Code em Nível L com máxima densidade de payload
+ * Gera um Data URL/Canvas de QR Code em Nível L com suporte a Byte Mode (Uint8Array puro)
  */
 export async function renderQRCodeToCanvas(
   canvas: HTMLCanvasElement,
-  textData: string
+  data: Uint8Array | string
 ): Promise<void> {
   try {
-    await QRCode.toCanvas(canvas, textData, {
-      errorCorrectionLevel: 'L', // Nível L para máxima capacidade (~7% redundância)
+    const qrSegments = typeof data === 'string' 
+      ? data 
+      : [{ data: data, mode: 'byte' as const }];
+
+    await QRCode.toCanvas(canvas, qrSegments as unknown as string, {
+      errorCorrectionLevel: 'L', // Nível L para máxima capacidade de bytes útil (~7% redundância)
       margin: 1,
       scale: 6,
       color: {
