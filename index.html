@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-DSfSAAio.js"></script>
+    <script type="module" crossorigin src="/quick-transfer-pwa/assets/index-D7b_K3WM.js"></script>
     <link rel="stylesheet" crossorigin href="/quick-transfer-pwa/assets/index-ukP6PlJC.css">
   <link rel="manifest" href="/quick-transfer-pwa/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer-pwa/registerSW.js"></script></head>
   <body>
@@ -77,12 +77,17 @@
           <div style="display: flex; gap: 0.75rem; flex-direction: column;">
             <button id="start-transfer-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              Iniciar Transmissão de Arquivo
+              Iniciar Envio
             </button>
-            <button id="add-another-file-btn" class="btn btn-secondary full-width-btn">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              Selecionar Outro Arquivo
-            </button>
+            <div style="display: flex; gap: 0.75rem;">
+              <button id="add-another-file-btn" class="btn btn-secondary full-width-btn" style="flex: 1;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Selecionar Outro Arquivo
+              </button>
+              <button id="remove-file-btn" class="btn btn-secondary" style="flex: 0; padding: 0 1rem; color: #ef4444; border-color: #ef4444;" title="Excluir Arquivo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -99,7 +104,7 @@
           <!-- Optical Handshake Status -->
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <span id="tx-sync-led" style="width: 12px; height: 12px; border-radius: 50%; background: var(--text-muted); transition: background 0.1s;"></span>
-            <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">Aguardando Sincronização...</span>
+            <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">Sincronizador de Envio</span>
           </div>
 
           <div style="display: flex; gap: 0.5rem; align-items: center;">
