@@ -537,13 +537,22 @@ input[type=number]:hover::-webkit-outer-spin-button {
   border-radius: 10px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
   z-index: 100;
-  display: none;
   overflow: hidden;
-  animation: fadeIn 0.15s ease;
+  opacity: 0;
+  visibility: hidden;
+  transform-origin: top center;
+  transform: scaleY(0.8) translateY(-10px);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              visibility 0.2s;
+  pointer-events: none;
 }
 
 .custom-select-wrapper.open .custom-select-options {
-  display: block;
+  opacity: 1;
+  visibility: visible;
+  transform: scaleY(1) translateY(0);
+  pointer-events: auto;
 }
 
 .custom-option {

@@ -135,9 +135,16 @@ function saveSettingsToLocalStorage(settings: UserSettings) {
 }
 
 function syncUIWithSettings() {
-  updateCustomSelectUI(userSettings.matrixSize);
-  qrDensityInput.value = userSettings.bytesPerQr.toString();
-  autoTimerInput.value = userSettings.autoTimerSec.toString();
+  if (userSettings.isCustom) {
+    updateCustomSelectUI(userSettings.matrixSize);
+    qrDensityInput.value = userSettings.bytesPerQr.toString();
+    autoTimerInput.value = userSettings.autoTimerSec.toString();
+  } else {
+    // No modo automático, exibe 'Selecione...' no dropdown e deixa os inputs limpos mostrando o placeholder de instrução
+    updateCustomSelectUI(null);
+    qrDensityInput.value = '';
+    autoTimerInput.value = '';
+  }
 }
 
 // Configuração do Custom Select Dropdown
@@ -163,7 +170,14 @@ function setupCustomSelect() {
   });
 }
 
-function updateCustomSelectUI(val: UserSettings['matrixSize']) {
+function updateCustomSelectUI(val: UserSettings['matrixSize'] | null) {
+  if (!val) {
+    customOptions.forEach(opt => opt.classList.remove('selected'));
+    customSelectValue.textContent = 'Selecione...';
+    customMatrixSelect.dataset.value = '';
+    return;
+  }
+
   customOptions.forEach(opt => {
     const optEl = opt as HTMLElement;
     if (optEl.dataset.value === val) {
