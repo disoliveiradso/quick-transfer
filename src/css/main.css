@@ -89,11 +89,11 @@ body {
 
 /* Container principal */
 .main-container {
-  flex: 1;
+  flex: 1 0 auto;
   max-width: 1000px;
   width: 100%;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2.5vh, 1.75rem) 1.25rem;
   display: flex;
   flex-direction: column;
 }
@@ -644,9 +644,18 @@ input[type=number]:hover::-webkit-outer-spin-button {
   white-space: nowrap;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+  .app-header {
+    padding: 0.85rem 1rem;
+  }
+
   .main-container {
-    padding: 0.75rem;
+    padding: 0.85rem 0.85rem;
+  }
+
+  .app-footer {
+    padding: 0.85rem 1rem 1.25rem 1rem;
+    margin-top: 1.25rem;
   }
 
   .tab-btn {
@@ -701,8 +710,8 @@ input[type=number]:hover::-webkit-outer-spin-button {
 .app-footer {
   background: transparent;
   border-top: none;
-  padding: 1.5rem 1rem 2rem 1rem;
-  margin-top: auto;
+  padding: 1.25rem 1rem 1.75rem 1rem;
+  margin-top: clamp(1rem, 3vh, 2.5rem);
   display: flex;
   justify-content: center;
   align-items: center;
