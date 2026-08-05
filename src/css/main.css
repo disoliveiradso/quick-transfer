@@ -603,7 +603,18 @@ input[type=number]:hover::-webkit-outer-spin-button {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* Prevenção de quebra de texto em telas estreitas */
+/* Suporte a Tela Cheia e Margem no Topo (Safe Area para Notches/Barra de Status) */
+#transmitter-display-section {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+}
+
+#transmitter-display-section:fullscreen,
+#transmitter-display-section:-webkit-full-screen {
+  background-color: var(--bg-primary);
+  padding: max(1.75rem, env(safe-area-inset-top)) 1.5rem 1.5rem 1.5rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
 .tab-btn span {
   white-space: nowrap;
 }
