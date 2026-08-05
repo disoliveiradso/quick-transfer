@@ -295,27 +295,43 @@ function setupTransmitterEvents() {
 }
 
 /**
- * Ajusta automaticamente o tamanho da matriz e a densidade com base no tamanho do arquivo
+ * Ajusta automaticamente o tamanho da matriz (Grid) e a densidade com base na quantidade total de QR Codes necessários.
+ * Regra Automática:
+ * - Se precisar de <= 6 QRs no total: exibe TODOS juntos na mesma página (ex: 2 QRs, 3 QRs, 4 QRs, 5 QRs ou 6 QRs).
+ * - Se precisar de > 6 QRs no total: divide em páginas com no máximo 6 QRs por página (ex: 8 QRs ➔ 1ª página com 6 QRs + 2ª página com 2 QRs).
  */
-function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; items: number; bytes: number } {
+function applyAutomaticSettings(fileSize: number): { matrixStr: '1x1' | '2x2' | '3x3'; itemsPerPage: number; bytes: number } {
   if (userSettings.isCustom) {
     let items = 4;
     if (userSettings.matrixSize === '1x1') items = 1;
     if (userSettings.matrixSize === '3x3') items = 9;
     return {
       matrixStr: userSettings.matrixSize,
-      items,
+      itemsPerPage: items,
       bytes: userSettings.bytesPerQr
     };
   }
 
-  if (fileSize < 200 * 1024) {
-    return { matrixStr: '1x1', items: 1, bytes: 2000 };
-  } else if (fileSize < 2 * 1024 * 1024) {
-    return { matrixStr: '2x2', items: 4, bytes: 2200 };
+  // No modo automático, usa 2000 bytes por QR para garantir alta velocidade de leitura no WASM
+  const bytes = 2000;
+  const totalChunksNeeded = Math.ceil(fileSize / bytes);
+
+  let itemsPerPage = 6;
+  let matrixStr: '1x1' | '2x2' | '3x3' = '3x3';
+
+  if (totalChunksNeeded <= 1) {
+    itemsPerPage = 1;
+    matrixStr = '1x1';
+  } else if (totalChunksNeeded <= 4) {
+    itemsPerPage = totalChunksNeeded; // Se precisar de 2, 3 ou 4 QRs, coloca TODOS na mesma página!
+    matrixStr = totalChunksNeeded <= 2 ? '2x2' : '2x2';
   } else {
-    return { matrixStr: '3x3', items: 9, bytes: 2500 };
+    // 5, 6 ou mais QRs ➔ usa blocos de no máximo 6 por página
+    itemsPerPage = 6;
+    matrixStr = '3x3';
   }
+
+  return { matrixStr, itemsPerPage, bytes };
 }
 
 async function rebuildTransmission() {
@@ -324,7 +340,7 @@ async function rebuildTransmission() {
   transmitterDisplayCard.style.display = 'flex';
 
   const autoConfig = applyAutomaticSettings(selectedFile.size);
-  itemsPerPage = autoConfig.items;
+  itemsPerPage = autoConfig.itemsPerPage;
   bytesPerQr = autoConfig.bytes;
   autoTimerSec = userSettings.autoTimerSec;
 
@@ -334,7 +350,7 @@ async function rebuildTransmission() {
   currentPages = pages;
   currentPageIndex = 0;
 
-  txFileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)}) • Grid ${autoConfig.matrixStr} (${totalChunks} QRs)`;
+  txFileInfo.textContent = `${selectedFile.name} (${formatBytes(selectedFile.size)}) • Grid ${autoConfig.matrixStr} (${totalChunks} QRs em ${pages.length} pág${pages.length > 1 ? 's' : ''})`;
   renderCurrentTransmitterPage();
 }
 
