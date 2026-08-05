@@ -1,5 +1,5 @@
 import { getZXingModule, readBarcodesFromImageData } from 'zxing-wasm/reader';
-import { unpackBinaryChunk } from '../transmitter/chunker';
+import { unpackChunkString } from '../transmitter/chunker';
 import type { FileChunkHeader } from '../transmitter/chunker';
 
 export interface ScannedQRInfo {
@@ -98,10 +98,15 @@ self.onmessage = async (e: MessageEvent<WorkerInputMessage>) => {
         const detectedList: ScannedQRInfo[] = [];
 
         for (const barcode of barcodes) {
-          const dataToUnpack = barcode.bytes && barcode.bytes.length > 0 ? barcode.bytes : (barcode.text || '');
-          if (!dataToUnpack) continue;
+          let textData = barcode.text || '';
+          if (!textData && barcode.bytes && barcode.bytes.length > 0) {
+            const textDecoder = new TextDecoder();
+            textData = textDecoder.decode(barcode.bytes);
+          }
 
-          const unpacked = unpackBinaryChunk(dataToUnpack);
+          if (!textData) continue;
+
+          const unpacked = unpackChunkString(textData);
           if (!unpacked) continue;
 
           detectedList.push({

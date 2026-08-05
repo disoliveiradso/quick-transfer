@@ -14,7 +14,7 @@ export interface FileChunkHeader {
 export interface ChunkPayload {
   header: FileChunkHeader;
   rawPayload: Uint8Array;
-  qrSegmentData: Uint8Array | string;
+  qrSegmentData: string;
 }
 
 export function generateFileId(file: File): string {
@@ -28,59 +28,35 @@ export function generateFileId(file: File): string {
   return Math.abs(hash).toString(36);
 }
 
-/**
- * Monta o segmento binário completo do QR Code injetando bytes brutos (Byte Mode):
- * Estrutura Binária Otimizada (Raw Byte Format):
- * [0..3]: Prefix Identifier 'QT1|'
- * [4..N]: JSON Header Minificado em UTF-8
- * [N+1]: Delimitador '|' (ASCII 124)
- * [N+2..End]: Raw Payload Bytes (`Uint8Array`) sem sobrecusto de Base64!
- */
-export function packBinaryChunk(header: FileChunkHeader, payloadBytes: Uint8Array): Uint8Array {
-  const encoder = new TextEncoder();
+export function packChunkString(header: FileChunkHeader, payloadBytes: Uint8Array): string {
+  let binaryString = '';
+  const len = payloadBytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binaryString += String.fromCharCode(payloadBytes[i]);
+  }
+  const base64Data = btoa(binaryString);
   const headerJson = JSON.stringify(header);
-  const prefixBytes = encoder.encode(`QT1|${headerJson}|`);
-
-  const fullLength = prefixBytes.byteLength + payloadBytes.byteLength;
-  const result = new Uint8Array(fullLength);
-
-  result.set(prefixBytes, 0);
-  result.set(payloadBytes, prefixBytes.byteLength);
-
-  return result;
+  return `QT1|${headerJson}|${base64Data}`;
 }
 
-/**
- * Desembala tanto formato binário bruto quanto em fallback de texto
- */
-export function unpackBinaryChunk(data: Uint8Array | string): { header: FileChunkHeader; dataBytes: Uint8Array } | null {
+export function unpackChunkString(dataStr: string): { header: FileChunkHeader; dataBytes: Uint8Array } | null {
   try {
-    const textDecoder = new TextDecoder();
+    if (!dataStr.startsWith('QT1|')) return null;
+    const parts = dataStr.split('|');
+    if (parts.length < 3) return null;
 
-    let bytes: Uint8Array;
-    if (typeof data === 'string') {
-      const encoder = new TextEncoder();
-      bytes = encoder.encode(data);
-    } else {
-      bytes = data;
+    const headerJson = parts[1];
+    const base64Data = parts[2];
+
+    const header: FileChunkHeader = JSON.parse(headerJson);
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Procura os delimitadores '|' (ASCII 124)
-    const PIPE_CHAR = 124;
-    const firstPipe = bytes.indexOf(PIPE_CHAR);
-    if (firstPipe === -1) return null;
-
-    const prefix = textDecoder.decode(bytes.subarray(0, firstPipe));
-    if (prefix !== 'QT1') return null;
-
-    const secondPipe = bytes.indexOf(PIPE_CHAR, firstPipe + 1);
-    if (secondPipe === -1) return null;
-
-    const headerJson = textDecoder.decode(bytes.subarray(firstPipe + 1, secondPipe));
-    const header: FileChunkHeader = JSON.parse(headerJson);
-    const dataBytes = bytes.subarray(secondPipe + 1);
-
-    return { header, dataBytes };
+    return { header, dataBytes: bytes };
   } catch (e) {
     return null;
   }
@@ -141,13 +117,13 @@ export async function chunkFileForGrid(
       chunk.header.i = i;
       chunk.header.tip = totalInPage;
 
-      // Pacote binário puro injetado diretamente em Byte Mode (sem Base64)
-      const packedBinary = packBinaryChunk(chunk.header, chunk.rawPayload);
+      // Pacote string pré-compactado para máxima compatibilidade com leitoras
+      const packedString = packChunkString(chunk.header, chunk.rawPayload);
 
       pageChunks.push({
         header: { ...chunk.header },
         rawPayload: chunk.rawPayload,
-        qrSegmentData: packedBinary
+        qrSegmentData: packedString
       });
     }
 
