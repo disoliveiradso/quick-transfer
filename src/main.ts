@@ -16,7 +16,6 @@ const homeSection = document.getElementById('home-section') as HTMLElement;
 const scannerSection = document.getElementById('scanner-section') as HTMLElement;
 const qrDisplaySection = document.getElementById('qr-display-section') as HTMLElement;
 const transferSection = document.getElementById('transfer-section') as HTMLElement;
-const killSwitchBtn = document.getElementById('kill-switch-btn') as HTMLButtonElement;
 
 // Inputs & Previews
 const fileDropzoneCard = document.getElementById('file-dropzone-card') as HTMLElement;
@@ -36,12 +35,16 @@ const sendTextBtn = document.getElementById('send-text-btn') as HTMLButtonElemen
 // Scanner
 const scannerVideo = document.getElementById('scanner-video') as HTMLVideoElement;
 const scannerBackBtn = document.getElementById('scanner-back-btn') as HTMLButtonElement;
+const scannerBackText = document.getElementById('scanner-back-text') as HTMLElement;
+const scannerCancelBtn = document.getElementById('scanner-cancel-btn') as HTMLButtonElement;
 const scannerTitle = document.getElementById('scanner-title') as HTMLElement;
 const scannerInstruction = document.getElementById('scanner-instruction') as HTMLElement;
 
 // QR Display
 const qrCanvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
 const qrBackBtn = document.getElementById('qr-back-btn') as HTMLButtonElement;
+const qrBackText = document.getElementById('qr-back-text') as HTMLElement;
+const qrCancelBtn = document.getElementById('qr-cancel-btn') as HTMLButtonElement;
 const qrDisplayTitle = document.getElementById('qr-display-title') as HTMLElement;
 const qrInstruction = document.getElementById('qr-instruction') as HTMLElement;
 const qrNextActionBtn = document.getElementById('qr-next-action-btn') as HTMLButtonElement;
@@ -58,6 +61,11 @@ const receivedTextContainer = document.getElementById('received-text-container')
 const receivedTextContent = document.getElementById('received-text-content') as HTMLElement;
 const copyTextBtn = document.getElementById('copy-text-btn') as HTMLButtonElement;
 const downloadButtonsContainer = document.getElementById('download-buttons-container') as HTMLElement;
+
+const sendMoreContainer = document.getElementById('send-more-container') as HTMLElement;
+const sendMoreFileInput = document.getElementById('send-more-file-input') as HTMLInputElement;
+const sendMoreFilesBtn = document.getElementById('send-more-files-btn') as HTMLButtonElement;
+const disconnectBtn = document.getElementById('disconnect-btn') as HTMLButtonElement;
 
 // Dialog
 const appDialogModal = document.getElementById('app-dialog-modal') as HTMLElement;
@@ -95,7 +103,6 @@ function updateFileListUI() {
     const item = document.createElement('div');
     item.className = 'file-list-item';
     
-    // Check if it's grid or list
     if (fileListDisplay.classList.contains('file-grid-view')) {
       item.innerHTML = `
         <div style="color: var(--accent-primary); margin-bottom: 0.5rem;">${getFileIcon(f.type)}</div>
@@ -145,7 +152,6 @@ function init() {
       sendTextBtn.style.display = 'none';
       updateFileListUI();
     }
-    // reset input value so selecting the same file again triggers change
     fileInput.value = '';
   });
 
@@ -194,23 +200,43 @@ function init() {
   // Start Receiver Flow
   receiveModeBtn.addEventListener('click', () => {
     currentRole = 'receiver';
-    killSwitchBtn.style.display = 'block';
     startScannerForOffer();
   });
 
-  // Navigations back
-  scannerBackBtn.addEventListener('click', cleanupAndGoHome);
-  qrBackBtn.addEventListener('click', cleanupAndGoHome);
-  killSwitchBtn.addEventListener('click', cleanupAndGoHome);
+  // Action to send more files over active WebRTC channel
+  sendMoreFilesBtn.addEventListener('click', () => {
+    sendMoreFileInput.click();
+  });
+
+  sendMoreFileInput.addEventListener('change', (e) => {
+    const files = (e.target as HTMLInputElement).files;
+    if (files && files.length > 0) {
+      selectedFiles = Array.from(files);
+      currentFileIndex = 0;
+      isTextTransfer = false;
+      sendMoreContainer.style.display = 'none';
+      transferProgressWrapper.style.display = 'block';
+      sendNextFile();
+    }
+    sendMoreFileInput.value = '';
+  });
+
+  disconnectBtn.addEventListener('click', cleanupAndGoHome);
+  scannerCancelBtn.addEventListener('click', cleanupAndGoHome);
+  qrCancelBtn.addEventListener('click', cleanupAndGoHome);
 }
 
 async function startSenderFlow() {
   currentRole = 'sender';
-  killSwitchBtn.style.display = 'block';
   showView(qrDisplaySection);
   qrDisplayTitle.textContent = "Passo 1: Criando Oferta...";
   qrInstruction.textContent = "Aguarde a geração do QR Code...";
   qrNextActionBtn.style.display = 'none';
+
+  // Configura botões de navegação no Passo 1 (Remetente)
+  qrBackText.textContent = "Cancelar";
+  qrCancelBtn.style.display = 'none';
+  qrBackBtn.onclick = cleanupAndGoHome;
 
   webrtcManager = new WebRTCManager(getWebRTCEvents());
   try {
@@ -236,6 +262,11 @@ function startScannerForOffer() {
   scannerTitle.textContent = "Escaneando Oferta";
   scannerInstruction.textContent = "Aponte a câmera para o QR Code de Oferta gerado pelo Transmissor.";
   
+  // Configura botões de navegação no Passo 1 (Receptor)
+  scannerBackText.textContent = "Cancelar";
+  scannerCancelBtn.style.display = 'none';
+  scannerBackBtn.onclick = cleanupAndGoHome;
+
   if (!scanner) scanner = new ScannerEngine();
   scanner.onDataDecoded = async (results) => {
     const data = results[0];
@@ -253,6 +284,13 @@ async function handleOfferScanned(offerStr: string) {
   qrDisplayTitle.textContent = "Passo 2: Criando Resposta...";
   qrInstruction.textContent = "Aguarde a geração do QR Code de resposta...";
   qrNextActionBtn.style.display = 'none';
+
+  // Configura botões no Passo 2 (Receptor - tem Voltar e Cancelar)
+  qrBackText.textContent = "Voltar";
+  qrCancelBtn.style.display = 'inline-flex';
+  qrBackBtn.onclick = () => {
+    startScannerForOffer();
+  };
 
   webrtcManager = new WebRTCManager(getWebRTCEvents());
   try {
@@ -273,6 +311,14 @@ function startScannerForAnswer() {
   scannerTitle.textContent = "Escaneando Resposta";
   scannerInstruction.textContent = "Aponte a câmera para o QR Code gerado pelo Receptor.";
   
+  // Configura botões no Passo 2 (Remetente - tem Voltar e Cancelar)
+  scannerBackText.textContent = "Voltar";
+  scannerCancelBtn.style.display = 'inline-flex';
+  scannerBackBtn.onclick = () => {
+    if (scanner) scanner.stop();
+    showView(qrDisplaySection);
+  };
+
   if (!scanner) scanner = new ScannerEngine();
   scanner.onDataDecoded = async (results) => {
     const data = results[0];
@@ -307,6 +353,7 @@ function getWebRTCEvents() {
       
       transferProgressWrapper.style.display = 'none';
       receivedTextContainer.style.display = 'none';
+      sendMoreContainer.style.display = 'none';
       downloadButtonsContainer.innerHTML = '';
       
       if (currentRole === 'sender') {
@@ -314,6 +361,7 @@ function getWebRTCEvents() {
           transferHeading.textContent = "Texto Enviado!";
           transferStatus.textContent = "O texto foi transmitido com sucesso.";
           webrtcManager!.sendText(textInput.value);
+          sendMoreContainer.style.display = 'flex';
         } else {
           transferHeading.textContent = "Conexão Estabelecida";
           transferProgressWrapper.style.display = 'block';
@@ -321,6 +369,7 @@ function getWebRTCEvents() {
           sendNextFile();
         }
       } else {
+        transferHeading.textContent = "Conexão Estabelecida";
         transferStatus.textContent = "Aguardando transmissão...";
       }
     },
@@ -337,7 +386,8 @@ function getWebRTCEvents() {
       }
     },
     onFileComplete: (file: File) => {
-      transferStatus.textContent = "Arquivo recebido com sucesso!";
+      transferHeading.textContent = "Arquivo Recebido!";
+      transferStatus.textContent = `O arquivo "${file.name}" foi recebido com sucesso.`;
       transferProgressFill.style.width = '100%';
       transferProgressText.textContent = '100%';
       transferBytesText.textContent = `${formatBytes(file.size)} / ${formatBytes(file.size)}`;
@@ -373,12 +423,15 @@ async function sendNextFile() {
   if (!webrtcManager || currentRole !== 'sender' || isTextTransfer) return;
   
   if (currentFileIndex >= selectedFiles.length) {
-    transferStatus.textContent = "Todos os arquivos foram enviados!";
+    transferHeading.textContent = "Arquivo(s) Enviado(s)!";
+    transferStatus.textContent = "Todos os arquivos foram transmitidos com sucesso.";
+    sendMoreContainer.style.display = 'flex';
     return;
   }
   
   const file = selectedFiles[currentFileIndex];
-  transferStatus.textContent = `Enviando arquivo ${currentFileIndex + 1} de ${selectedFiles.length}: ${file.name}`;
+  transferHeading.textContent = "Enviando Arquivo...";
+  transferStatus.textContent = `Enviando ${currentFileIndex + 1} de ${selectedFiles.length}: ${file.name}`;
   
   try {
     await webrtcManager.sendFile(file, updateProgress);
@@ -418,12 +471,12 @@ function cleanupAndGoHome() {
   
   currentRole = null;
   isTextTransfer = false;
-  killSwitchBtn.style.display = 'none';
   downloadButtonsContainer.innerHTML = '';
   transferProgressFill.style.width = '0%';
   transferProgressText.textContent = '0%';
   transferBytesText.textContent = '0 / 0 MB';
   receivedTextContainer.style.display = 'none';
+  sendMoreContainer.style.display = 'none';
   
   selectedFiles = [];
   textInput.value = '';

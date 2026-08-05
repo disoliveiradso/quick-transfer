@@ -90,18 +90,19 @@ body {
 /* Container principal */
 .main-container {
   flex: 1;
-  max-width: 1000px;
+  max-width: 520px;
   width: 100%;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 1rem 1rem;
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .view-section {
   display: none;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   width: 100%;
   animation: fadeIn 0.3s ease;
 }
@@ -699,10 +700,10 @@ input[type=number]:hover::-webkit-outer-spin-button {
 
 /* Footer */
 .app-footer {
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-  padding: 1rem 1.5rem;
-  margin-top: auto;
+  background: transparent;
+  border-top: none;
+  padding: 0.75rem 1rem;
+  margin-top: 0.5rem;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -716,20 +717,20 @@ input[type=number]:hover::-webkit-outer-spin-button {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--text-main);
+  color: var(--text-muted);
   text-decoration: none;
-  font-weight: 600;
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   transition: all 0.2s ease;
 }
 
 .github-link:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  color: var(--text-main);
 }
 
   
