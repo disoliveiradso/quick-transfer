@@ -232,16 +232,21 @@ function init() {
   connectCodeBtn.addEventListener('click', () => {
     let inputVal = manualCodeInput.value.trim().toUpperCase();
     if (!inputVal) {
-      showDialog("Por favor, digite o código de conexão exibido no Receptor.");
+      showDialog('Por favor, digite o código de conexão.');
       return;
     }
 
+    // Garante o prefixo QT-
     if (!inputVal.startsWith('QT-')) {
-      inputVal = `QT-${inputVal.replace(/^QT-?/, '')}`;
+      // Remove qualquer prefixo parcial "QT" sem hífen e adiciona correto
+      const stripped = inputVal.replace(/^QT-?/i, '');
+      inputVal = `QT-${stripped}`;
     }
 
-    if (inputVal.length < 5) {
-      showDialog("Código de conexão muito curto. Verifique o código exibido no Receptor.");
+    // O sufixo deve ter ao menos 4 caracteres (ex: QT-ABCD)
+    const suffix = inputVal.replace('QT-', '');
+    if (suffix.length < 4) {
+      showDialog('Código muito curto. O código tem o formato QT-XXXXXX (6 caracteres após o hífen).');
       return;
     }
 
@@ -528,17 +533,48 @@ async function handleScannedCode(rawSessionId: string) {
   }
 
   if (scanner) scanner.stop();
-  scannerInstruction.textContent = 'Processando conexão...';
 
-  const payload = await fetchAndDeletePayload(code);
+  // Estado visual de "carregando" — feedback imediato ao usuário
+  setConnectBtnLoading(true);
+  const scannerStepDesc = document.getElementById('scanner-step-desc');
+  const prevDesc = scannerStepDesc?.textContent ?? '';
+  if (scannerStepDesc) scannerStepDesc.textContent = `Buscando código ${code} no servidor...`;
+  scannerInstruction.textContent = 'Aguarde, verificando código no servidor...';
+
+  let payload: string | null = null;
+  try {
+    payload = await fetchAndDeletePayload(code);
+  } catch (err: any) {
+    // Erro de rede/Supabase — permite retry sem destruir o estado
+    setConnectBtnLoading(false);
+    if (scannerStepDesc) scannerStepDesc.textContent = prevDesc;
+    scannerInstruction.textContent = 'Erro ao contatar o servidor.';
+    showDialog(
+      `Não foi possível contatar o servidor de sinalização.\n\nVerifique sua conexão com a internet e tente novamente.\n\nDetalhes: ${err?.message ?? err}`,
+      'Erro de Rede'
+    );
+    return; // NÃO destrói o estado — o usuário pode tentar novamente
+  }
+
+  setConnectBtnLoading(false);
+
   if (!payload) {
-    showDialog('Código inválido ou expirado. Tente novamente.', 'Erro');
-    cleanupAndGoHome();
+    // Código não encontrado — restaura UI e permite corrigir sem ir para home
+    if (scannerStepDesc) scannerStepDesc.textContent = prevDesc;
+    scannerInstruction.textContent = 'Código não encontrado.';
+    showDialog(
+      `O código "${code}" não foi encontrado ou já expirou.\n\nVerifique se:\n• O código foi digitado corretamente (sem espaços)\n• O outro dispositivo ainda está mostrando o código\n• O código ainda não foi usado em outra tentativa`,
+      'Código Inválido'
+    );
+    // NÃO vai para home — permite o usuário corrigir e tentar novamente
+    if (manualCodeInput) manualCodeInput.focus();
     return;
   }
 
+  // Código encontrado — processa conforme o papel do dispositivo
   if (currentRole === 'receiver') {
-    // Receptor pegou a Offer, agora gera a Answer
+    // Receptor pegou a Offer → gera a Answer
+    if (scannerStepDesc) scannerStepDesc.textContent = 'Conectando... Gerando código de resposta...';
     webrtcManager = new WebRTCManager(getWebRTCEvents());
     try {
       const answerSdp = await webrtcManager.acceptOfferAndCreateAnswer(payload);
@@ -547,7 +583,7 @@ async function handleScannedCode(rawSessionId: string) {
       currentSessionId = `QT-${answerPart}`;
       await savePayload(currentSessionId, answerSdp);
 
-      // Etapa 2: Receptor exibe o código 2 para o Transmissor escanear
+      // Etapa 2: Receptor exibe o código 2 para o Transmissor escanear/digitar
       await showQrPage({
         title: 'Receber Arquivo',
         step: 2,
@@ -555,23 +591,37 @@ async function handleScannedCode(rawSessionId: string) {
         stepDesc: 'Agora escaneie este QR Code ou digite este código no dispositivo transmissor',
         instruction: 'Mostre este QR Code para o dispositivo que está enviando escanear:',
         code: currentSessionId,
-        // Sem botão de avançar: a conexão abre automaticamente quando o Transmissor escanear
+        // Sem botão de avançar: a conexão abre automaticamente quando o Transmissor escanear/digitar
       });
-    } catch (err) {
-      showDialog('Falha ao processar oferta WebRTC.');
+    } catch (err: any) {
+      showDialog(`Falha ao processar oferta WebRTC.\n\nDetalhes: ${err?.message ?? err}`, 'Erro WebRTC');
       cleanupAndGoHome();
     }
   } else if (currentRole === 'sender') {
-    // Transmissor pegou a Answer, fecha o canal P2P
+    // Transmissor pegou a Answer → sela o canal P2P
+    if (scannerStepDesc) scannerStepDesc.textContent = 'Conectando... Estabelecendo túnel P2P...';
     try {
       await webrtcManager!.acceptAnswer(payload);
-      // onDataChannelOpen dispara automaticamente -> progress page
-    } catch (err) {
-      showDialog('Falha ao aceitar resposta P2P.');
+      // onDataChannelOpen dispara automaticamente → progress page
+    } catch (err: any) {
+      showDialog(`Falha ao aceitar resposta P2P.\n\nDetalhes: ${err?.message ?? err}`, 'Erro WebRTC');
       cleanupAndGoHome();
     }
   }
 }
+
+/**
+ * Ativa/desativa o estado de carregando no botão Conectar e no input manual.
+ */
+function setConnectBtnLoading(loading: boolean) {
+  if (connectCodeBtn) {
+    connectCodeBtn.disabled = loading;
+    connectCodeBtn.textContent = loading ? 'Buscando...' : 'Conectar';
+  }
+  if (manualCodeInput) manualCodeInput.disabled = loading;
+  if (openCameraBtn) openCameraBtn.disabled = loading;
+}
+
 
 
 
