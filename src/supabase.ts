@@ -66,3 +66,15 @@ export async function deleteSessionRecord(sessionId: string): Promise<void> {
     console.warn('Erro ao auto-destruir registro de sessão:', e);
   }
 }
+
+/**
+ * Limpeza preventiva de sessões antigas/abandonadas (TTL de 10 minutos)
+ */
+export async function cleanupStaleSessions(): Promise<void> {
+  try {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await supabase.from('sessoes').delete().lt('created_at', tenMinutesAgo);
+  } catch (e) {
+    // Ignora silenciosamente
+  }
+}

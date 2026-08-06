@@ -6,7 +6,8 @@ import {
   createReceiverSession, 
   sendOfferToSession, 
   sendAnswerToSession, 
-  deleteSessionRecord 
+  deleteSessionRecord,
+  cleanupStaleSessions
 } from './supabase';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -312,22 +313,6 @@ function init() {
     openCameraBtn.style.display = 'block';
   });
 
-  // Alternadores Bidirecionais de Modo (QR Code vs Escanear/Digitar)
-  const switchToQrBtn = document.getElementById('switch-to-qr-btn');
-  if (switchToQrBtn) {
-    switchToQrBtn.addEventListener('click', () => {
-      if (scanner) scanner.stop();
-      startReceiverFlow();
-    });
-  }
-
-  const switchToScannerBtn = document.getElementById('switch-to-scanner-btn');
-  if (switchToScannerBtn) {
-    switchToScannerBtn.addEventListener('click', () => {
-      startSenderFlow();
-    });
-  }
-
   // Navegação nativa por botão Voltar do dispositivo / navegador
   window.addEventListener('popstate', () => {
     if (!homeSection.classList.contains('active')) {
@@ -368,6 +353,7 @@ function init() {
  */
 async function startReceiverFlow() {
   cleanupAndGoHome();
+  cleanupStaleSessions(); // Limpeza preventiva de sessões expiradas
   currentRole = 'receiver';
   showView(qrDisplaySection);
 
