@@ -84,10 +84,35 @@ const appDialogTitle = document.getElementById('app-dialog-title') as HTMLElemen
 const appDialogMessage = document.getElementById('app-dialog-message') as HTMLElement;
 const appDialogOkBtn = document.getElementById('app-dialog-ok-btn') as HTMLButtonElement;
 
+// Modal de Confirmação Mútua (Receptor)
+const appConfirmModal = document.getElementById('app-confirm-modal') as HTMLElement;
+const appConfirmTitle = document.getElementById('app-confirm-title') as HTMLElement;
+const appConfirmMessage = document.getElementById('app-confirm-message') as HTMLElement;
+const appConfirmAcceptBtn = document.getElementById('app-confirm-accept-btn') as HTMLButtonElement;
+const appConfirmRejectBtn = document.getElementById('app-confirm-reject-btn') as HTMLButtonElement;
+
 function showDialog(message: string, title: string = 'Aviso') {
   appDialogTitle.textContent = title;
   appDialogMessage.innerHTML = message.replace(/\n/g, '<br/>');
   appDialogModal.style.display = 'flex';
+}
+
+function showConfirmDialog(message: string, title: string = 'Solicitação de Conexão'): Promise<boolean> {
+  return new Promise((resolve) => {
+    appConfirmTitle.textContent = title;
+    appConfirmMessage.innerHTML = message.replace(/\n/g, '<br/>');
+    appConfirmModal.style.display = 'flex';
+
+    appConfirmAcceptBtn.onclick = () => {
+      appConfirmModal.style.display = 'none';
+      resolve(true);
+    };
+
+    appConfirmRejectBtn.onclick = () => {
+      appConfirmModal.style.display = 'none';
+      resolve(false);
+    };
+  });
 }
 
 function getFileIcon(type: string): string {
@@ -356,8 +381,23 @@ function listenForOfferOnSupabase(sessionId: string) {
     if (hasHandledOffer) return;
     hasHandledOffer = true;
 
-    // Parar escutas do Supabase
+    // Parar escutas do Supabase temporariamente
     stopSupabaseListening();
+    audioBeep();
+
+    // CONFIRMAÇÃO / AUTENTICAÇÃO MÚTUA CLIENT-SIDE NO RECEPTOR
+    const isAccepted = await showConfirmDialog(
+      `Um dispositivo remoto solicitou conexão P2P (Código: ${sessionId}).\n\nDeseja autenticar e aceitar este pareamento?`,
+      "Solicitação de Conexão"
+    );
+
+    if (!isAccepted) {
+      // Usuário recusou no Receptor: exclui registro no Supabase e reseta
+      await deleteSessionRecord(sessionId);
+      showDialog("Conexão recusada pelo usuário.");
+      cleanupAndGoHome();
+      return;
+    }
 
     webrtcManager = new WebRTCManager(getWebRTCEvents());
     try {
