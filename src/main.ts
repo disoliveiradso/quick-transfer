@@ -312,76 +312,194 @@ function init() {
   qrBackBtn.addEventListener('click', () => cancelAndGoHome());
 }
 
+// --------------- Helpers de indicador de passo ---------------
+
+function setScannerStep(step: 1 | 2, totalSteps: 2 | 3 = 2) {
+  const label = document.getElementById('scanner-step-label');
+  const dot1 = document.getElementById('scanner-dot-1');
+  const dot2 = document.getElementById('scanner-dot-2');
+  const dot3 = document.getElementById('scanner-dot-3');
+  const line1 = document.getElementById('scanner-step-line');
+  const line2 = document.getElementById('scanner-step-line2');
+
+  if (!label || !dot1 || !dot2 || !dot3 || !line1 || !line2) return;
+
+  // Reset
+  [dot1, dot2, dot3].forEach(d => {
+    d.style.background = 'var(--bg-secondary)';
+    d.style.border = '2px solid var(--border-color)';
+    d.style.color = 'var(--text-muted)';
+  });
+  [line1, line2].forEach(l => l.style.width = '0%');
+  dot3.style.display = totalSteps === 3 ? 'flex' : 'none';
+  (dot3.previousElementSibling as HTMLElement | null)?.style && ((dot3.previousElementSibling as HTMLElement).style.display = totalSteps === 3 ? 'block' : 'none');
+
+  // Ativa passo
+  const activateStyle = (dot: HTMLElement) => {
+    dot.style.background = 'var(--accent-primary)';
+    dot.style.border = 'none';
+    dot.style.color = 'white';
+  };
+
+  activateStyle(dot1);
+  if (step >= 2) { line1.style.width = '100%'; activateStyle(dot2); }
+  if (step >= 3) { line2.style.width = '100%'; activateStyle(dot3); }
+
+  if (label) label.textContent = `Etapa ${step} de ${totalSteps}`;
+}
+
+function setQrStep(step: 1 | 2, totalSteps: 2 | 3 = 2) {
+  const label = document.getElementById('qr-step-label');
+  const dot1 = document.getElementById('qr-dot-1');
+  const dot2 = document.getElementById('qr-dot-2');
+  const dot3 = document.getElementById('qr-dot-3');
+  const line1 = document.getElementById('qr-step-line');
+  const line2 = document.getElementById('qr-step-line2');
+
+  if (!label || !dot1 || !dot2 || !dot3 || !line1 || !line2) return;
+
+  [dot1, dot2, dot3].forEach(d => {
+    d.style.background = 'var(--bg-secondary)';
+    d.style.border = '2px solid var(--border-color)';
+    d.style.color = 'var(--text-muted)';
+  });
+  [line1, line2].forEach(l => l.style.width = '0%');
+  dot3.style.display = totalSteps === 3 ? 'flex' : 'none';
+  (dot3.previousElementSibling as HTMLElement | null)?.style && ((dot3.previousElementSibling as HTMLElement).style.display = totalSteps === 3 ? 'block' : 'none');
+
+  const activateStyle = (dot: HTMLElement) => {
+    dot.style.background = 'var(--accent-primary)';
+    dot.style.border = 'none';
+    dot.style.color = 'white';
+  };
+
+  activateStyle(dot1);
+  if (step >= 2) { line1.style.width = '100%'; activateStyle(dot2); }
+  if (step >= 3) { line2.style.width = '100%'; activateStyle(dot3); }
+
+  if (label) label.textContent = `Etapa ${step} de ${totalSteps}`;
+}
+
+function showScannerPage(options: {
+  title: string;
+  step: 1 | 2;
+  totalSteps?: 2 | 3;
+  stepDesc: string;
+  cameraInstruction: string;
+}) {
+  showView(scannerSection);
+  manualCodeInput.value = '';
+  cameraPreviewWrapper.style.display = 'none';
+  openCameraBtn.style.display = 'block';
+
+  const scannerTitle = document.getElementById('scanner-title');
+  const scannerStepDesc = document.getElementById('scanner-step-desc');
+  if (scannerTitle) scannerTitle.textContent = options.title;
+  if (scannerStepDesc) scannerStepDesc.textContent = options.stepDesc;
+  scannerInstruction.textContent = options.cameraInstruction;
+  setScannerStep(options.step, options.totalSteps ?? 2);
+}
+
+async function showQrPage(options: {
+  title: string;
+  step: 1 | 2;
+  totalSteps?: 2 | 3;
+  stepDesc: string;
+  instruction: string;
+  code: string;
+  proceedLabel?: string;
+  onProceed?: () => void;
+}) {
+  showView(qrDisplaySection);
+
+  const sectionTitle = document.getElementById('qr-section-title');
+  const instruction = document.getElementById('qr-instruction');
+  const stepDesc = document.getElementById('qr-step-desc');
+  const proceedBtn = document.getElementById('qr-proceed-btn') as HTMLButtonElement;
+
+  if (sectionTitle) sectionTitle.textContent = options.title;
+  if (instruction) instruction.textContent = options.instruction;
+  if (stepDesc) stepDesc.textContent = options.stepDesc;
+  sessionCodeDisplay.textContent = options.code;
+  await renderQRCodeToCanvas(qrCanvas, options.code);
+  setQrStep(options.step, options.totalSteps ?? 2);
+
+  if (options.onProceed && options.proceedLabel) {
+    proceedBtn.textContent = options.proceedLabel;
+    proceedBtn.style.display = 'block';
+    proceedBtn.onclick = options.onProceed;
+  } else {
+    proceedBtn.style.display = 'none';
+    proceedBtn.onclick = null;
+  }
+}
+
+// --------------- Fluxos Principais ---------------
+
 /**
- * ----------------------------------------------------
  * FLUXO DO RECEPTOR
- * ----------------------------------------------------
- * Etapa 1: Escaneia/Digita o código 1 do Transmissor
- * Etapa 2: Gera o código 2 e aguarda o Transmissor escanear/digitar
+ * Etapa 1: Escaneia/Digita o código do Transmissor
+ * Etapa 2: Exibe o seu QR Code de resposta para o Transmissor escanear
  */
 async function startReceiverFlow() {
   cleanupAndGoHome();
   cleanupStaleSessions();
   currentRole = 'receiver';
-  
-  // O Receptor começa lendo o código 1
-  showView(scannerSection);
-  manualCodeInput.value = '';
-  cameraPreviewWrapper.style.display = 'none';
-  openCameraBtn.style.display = 'block';
-  
-  const scannerTitle = document.getElementById('scanner-title');
-  if (scannerTitle) scannerTitle.textContent = "Conectar ao Transmissor";
-  scannerInstruction.textContent = "Aponte a câmera para o QR Code exibido no Transmissor.";
+
+  // Etapa 1: O Receptor escaneia o código do Transmissor
+  showScannerPage({
+    title: 'Receber Arquivo',
+    step: 1,
+    totalSteps: 2,
+    stepDesc: 'Escaneie o QR Code ou digite o código do dispositivo que irá enviar',
+    cameraInstruction: 'Aponte a câmera para o QR Code exibido no dispositivo Transmissor.',
+  });
 }
 
 /**
- * ----------------------------------------------------
  * FLUXO DO TRANSMISSOR
- * ----------------------------------------------------
- * Etapa 1: Gera código 1 e exibe na tela
- * Etapa 2: Clica em Continuar e escaneia o código 2 do Receptor
+ * Etapa 1: Gera código 1 e exibe na tela para o Receptor escanear
+ * Etapa 2: Escaneia o código 2 gerado pelo Receptor
  */
 async function startSenderFlow() {
   cleanupAndGoHome();
   cleanupStaleSessions();
   currentRole = 'sender';
-  
-  // O Transmissor começa gerando o código 1
-  showView(qrDisplaySection);
-  
+
+  // Gera o código 1 e salva a Offer
   const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
   currentSessionId = `QT-${randomPart}`;
-  
-  sessionCodeDisplay.textContent = currentSessionId;
-  await renderQRCodeToCanvas(qrCanvas, currentSessionId);
-  
-  const qrInstruction = document.getElementById('qr-instruction');
-  if (qrInstruction) qrInstruction.textContent = "Escaneie o QR Code com o dispositivo que receberá os arquivos:";
-  
-  const qrProceedBtn = document.getElementById('qr-proceed-btn');
-  if (qrProceedBtn) {
-    qrProceedBtn.style.display = 'block';
-    qrProceedBtn.onclick = () => {
-      // Avança para a Etapa 2 (Escanear código do Receptor)
-      showView(scannerSection);
-      manualCodeInput.value = '';
-      cameraPreviewWrapper.style.display = 'none';
-      openCameraBtn.style.display = 'block';
-      const scannerTitle = document.getElementById('scanner-title');
-      if (scannerTitle) scannerTitle.textContent = "Conectar ao Receptor";
-      scannerInstruction.textContent = "Aponte a câmera para o QR Code de Resposta gerado no Receptor.";
-    };
-  }
-  
+
   webrtcManager = new WebRTCManager(getWebRTCEvents());
   try {
     const offerSdp = await webrtcManager.createOffer();
     await savePayload(currentSessionId, offerSdp);
   } catch (err) {
-    showDialog("Erro ao criar sessão.");
+    showDialog('Erro ao criar sessão de envio.');
     cleanupAndGoHome();
+    return;
   }
+
+  // Etapa 1: Exibe o QR Code 1 para o Receptor escanear
+  await showQrPage({
+    title: 'Enviar Arquivo',
+    step: 1,
+    totalSteps: 2,
+    stepDesc: 'Escaneie o QR Code ou digite o código do dispositivo para onde você quer enviar',
+    instruction: 'Mostre este QR Code para o dispositivo receptor escanear:',
+    code: currentSessionId,
+    proceedLabel: 'Continuar: Escanear código de resposta',
+    onProceed: () => {
+      // Etapa 2: Transmissor escaneia o código 2 do Receptor
+      showScannerPage({
+        title: 'Enviar Arquivo',
+        step: 2,
+        totalSteps: 2,
+        stepDesc: 'Agora escaneie o QR Code ou digite o código exibido no dispositivo receptor',
+        cameraInstruction: 'Aponte a câmera para o QR Code gerado no dispositivo Receptor.',
+      });
+    },
+  });
 }
 
 /**
@@ -398,7 +516,7 @@ function startCameraScanner() {
     }
   };
   scanner.start(scannerVideo).catch(() => {
-    scannerInstruction.textContent = "Câmera indisponível. Utilize o código de conexão acima.";
+    scannerInstruction.textContent = 'Câmera indisponível. Utilize o código de conexão acima.';
   });
 }
 
@@ -409,47 +527,46 @@ async function handleScannedCode(rawSessionId: string) {
   }
 
   if (scanner) scanner.stop();
-  scannerInstruction.textContent = "Processando conexão...";
-  
+  scannerInstruction.textContent = 'Processando conexão...';
+
   const payload = await fetchAndDeletePayload(code);
   if (!payload) {
-    showDialog("Código inválido ou expirado. Tente novamente.", "Erro");
+    showDialog('Código inválido ou expirado. Tente novamente.', 'Erro');
     cleanupAndGoHome();
     return;
   }
 
   if (currentRole === 'receiver') {
-    // Receptor pegou a Offer, agora gera a Answer (Etapa 2)
+    // Receptor pegou a Offer, agora gera a Answer
     webrtcManager = new WebRTCManager(getWebRTCEvents());
     try {
       const answerSdp = await webrtcManager.acceptOfferAndCreateAnswer(payload);
-      
-      const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
-      currentSessionId = `QT-${randomPart}`;
-      
+
+      const answerPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+      currentSessionId = `QT-${answerPart}`;
       await savePayload(currentSessionId, answerSdp);
-      
-      showView(qrDisplaySection);
-      sessionCodeDisplay.textContent = currentSessionId;
-      await renderQRCodeToCanvas(qrCanvas, currentSessionId);
-      
-      const qrInstruction = document.getElementById('qr-instruction');
-      if (qrInstruction) qrInstruction.textContent = "Pronto! Agora escaneie este QR Code com o dispositivo Transmissor:";
-      
-      const qrProceedBtn = document.getElementById('qr-proceed-btn');
-      if (qrProceedBtn) qrProceedBtn.style.display = 'none'; // Receptor não precisa clicar para avançar
-      
+
+      // Etapa 2: Receptor exibe o código 2 para o Transmissor escanear
+      await showQrPage({
+        title: 'Receber Arquivo',
+        step: 2,
+        totalSteps: 2,
+        stepDesc: 'Agora escaneie este QR Code ou digite este código no dispositivo transmissor',
+        instruction: 'Mostre este QR Code para o dispositivo que está enviando escanear:',
+        code: currentSessionId,
+        // Sem botão de avançar: a conexão abre automaticamente quando o Transmissor escanear
+      });
     } catch (err) {
-      showDialog("Falha ao processar oferta WebRTC.");
+      showDialog('Falha ao processar oferta WebRTC.');
       cleanupAndGoHome();
     }
   } else if (currentRole === 'sender') {
-    // Transmissor pegou a Answer, conecta (Etapa 3)
+    // Transmissor pegou a Answer, fecha o canal P2P
     try {
       await webrtcManager!.acceptAnswer(payload);
-      // O túnel P2P abre automaticamente via getWebRTCEvents() -> onDataChannelOpen
+      // onDataChannelOpen dispara automaticamente -> progress page
     } catch (err) {
-      showDialog("Falha ao aceitar resposta P2P.");
+      showDialog('Falha ao aceitar resposta P2P.');
       cleanupAndGoHome();
     }
   }
