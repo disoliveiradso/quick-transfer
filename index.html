@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/quick-transfer/assets/index-eIrBb2Mu.js"></script>
+  <script type="module" crossorigin src="/quick-transfer/assets/index-CJdrjG7I.js"></script>
   <link rel="stylesheet" crossorigin href="/quick-transfer/assets/index-DSMsCF2k.css">
 <link rel="manifest" href="/quick-transfer/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/quick-transfer/registerSW.js"></script></head>
 
@@ -112,30 +112,42 @@
       </button>
     </section>
 
-    <!-- SEÇÃO 2: SCANNER / CONECTAR (Transmissor) -->
+    <!-- SEÇÃO 2: SCANNER / CONECTAR -->
     <section id="scanner-section" class="view-section">
-      <div
-        style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <button id="scanner-back-btn" class="btn btn-secondary"
-            style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-            <span id="scanner-back-text">Cancelar</span>
-          </button>
-        </div>
+      <!-- Cabeçalho com Cancelar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
+        <button id="scanner-back-btn" class="btn btn-secondary"
+          style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          <span id="scanner-back-text">Cancelar</span>
+        </button>
         <span id="scanner-title"
-          style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Conectar
-          ao Receptor</span>
+          style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Conectar</span>
       </div>
 
-      <!-- 1. Digitar Código Manual (Mascara automática QT-) -->
+      <!-- Indicador de Passo -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-bottom: 1rem;">
+        <div id="scanner-dot-1" style="width: 30px; height: 30px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: white; flex-shrink: 0;">1</div>
+        <div style="flex: 1; max-width: 56px; height: 2px; background: var(--border-color); border-radius: 2px; overflow: hidden;">
+          <div id="scanner-step-line" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.4s ease;"></div>
+        </div>
+        <div id="scanner-dot-2" style="width: 30px; height: 30px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0;">2</div>
+        <div style="flex: 1; max-width: 56px; height: 2px; background: var(--border-color); border-radius: 2px; overflow: hidden;">
+          <div id="scanner-step-line2" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.4s ease;"></div>
+        </div>
+        <div id="scanner-dot-3" style="width: 30px; height: 30px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0;">3</div>
+      </div>
+      <p id="scanner-step-label" style="text-align: center; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">Etapa 1 de 2</p>
+      <p id="scanner-step-desc" style="text-align: center; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.5;">Escaneie o QR Code ou digite o código do dispositivo para onde você quer enviar</p>
+
+      <!-- 1. Digitar Código Manual -->
       <div class="card"
         style="padding: 1rem; text-align: center; margin-bottom: 0.75rem; box-sizing: border-box; width: 100%;">
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">Digite o
-          código de conexão exibido no Receptor:</p>
+          código de conexão:</p>
         <div style="display: flex; gap: 0.5rem; width: 100%; box-sizing: border-box; align-items: center;">
           <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" maxlength="9"
             style="flex: 1; min-width: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 700; text-transform: uppercase; text-align: center; font-size: 0.95rem; outline: none; box-sizing: border-box; letter-spacing: 1px;" />
@@ -154,7 +166,7 @@
         <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
       </div>
 
-      <!-- 2. Botão para Abrir Câmera e Área da Câmera Quadrada -->
+      <!-- 2. Botão para Abrir Câmera -->
       <div id="camera-trigger-container" style="text-align: center;">
         <button id="open-camera-btn" class="btn btn-secondary full-width-btn"
           style="padding: 0.75rem; font-size: 0.95rem; margin-bottom: 0.75rem;">
@@ -174,7 +186,7 @@
         </div>
         <p id="scanner-instruction"
           style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
-          Aponte a câmera para o QR Code exibido no Receptor.
+          Aponte a câmera para o QR Code.
         </p>
         <button id="close-camera-btn" class="btn btn-secondary"
           style="font-size: 0.85rem; padding: 0.5rem 1rem; color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
@@ -187,23 +199,36 @@
       </div>
     </section>
 
-    <!-- SEÇÃO 3: QR CODE DISPLAY (Receptor exibe o QR Code e Código de Sessão) -->
+    <!-- SEÇÃO 3: QR CODE DISPLAY -->
     <section id="qr-display-section" class="view-section">
-      <div
-        style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <button id="qr-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.75rem;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>Cancelar</span>
-          </button>
-        </div>
-        <span
+      <!-- Cabeçalho com Cancelar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
+        <button id="qr-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.75rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          <span>Cancelar</span>
+        </button>
+        <span id="qr-section-title"
           style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Aguardando
           Conexão</span>
       </div>
+
+      <!-- Indicador de Passo -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-bottom: 1rem;">
+        <div id="qr-dot-1" style="width: 30px; height: 30px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: white; flex-shrink: 0;">1</div>
+        <div style="flex: 1; max-width: 56px; height: 2px; background: var(--border-color); border-radius: 2px; overflow: hidden;">
+          <div id="qr-step-line" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.4s ease;"></div>
+        </div>
+        <div id="qr-dot-2" style="width: 30px; height: 30px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0;">2</div>
+        <div style="flex: 1; max-width: 56px; height: 2px; background: var(--border-color); border-radius: 2px; overflow: hidden;">
+          <div id="qr-step-line2" style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.4s ease;"></div>
+        </div>
+        <div id="qr-dot-3" style="width: 30px; height: 30px; border-radius: 50%; background: var(--bg-secondary); border: 2px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0;">3</div>
+      </div>
+      <p id="qr-step-label" style="text-align: center; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem;">Etapa 1 de 2</p>
+      <p id="qr-step-desc" style="text-align: center; font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.85rem; line-height: 1.5;">Mostre este código para o outro dispositivo escanear</p>
 
       <div class="card" style="text-align: center; padding: 1.25rem;">
         <p id="qr-instruction" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Escaneie o QR Code com o
@@ -213,14 +238,14 @@
         </div>
         <div
           style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 500;">Código de
-            Conexão Manual:</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 500;">Código
+            Manual:</p>
           <p id="session-code-display"
             style="font-family: monospace; font-size: 1.35rem; font-weight: 700; color: var(--accent-primary); letter-spacing: 2px; margin-top: 0.4rem; user-select: all;">
           </p>
         </div>
         <button id="qr-proceed-btn" class="btn full-width-btn" style="margin-top: 1rem; background: var(--accent-primary); display: none;">
-          Escanear Código de Resposta
+          Continuar: Escanear Código de Resposta
         </button>
       </div>
     </section>
