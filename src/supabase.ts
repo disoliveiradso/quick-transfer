@@ -5,59 +5,44 @@ const SUPABASE_ANON_KEY = "sb_publishable_eFn8MqSWi1C2a7eNmPec8g_1FjAyy3T";
 
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-export interface SessionData {
-  id: string;
-  offer?: string | null;
-  answer?: string | null;
-  created_at?: string;
-}
-
 /**
- * Receptor: cria uma nova sessão vazia na tabela "sessoes"
+ * Salva um payload (SDP Offer ou Answer) atrelado a um código curto.
+ * Usa a coluna 'offer' como um campo genérico de texto longo (KV Store).
  */
-export async function createReceiverSession(sessionId: string): Promise<void> {
-  const { error } = await supabase.from('sessoes').insert([{ id: sessionId }]);
+export async function savePayload(id: string, payload: string): Promise<void> {
+  const { error } = await supabase.from('sessoes').insert([{ id, offer: payload }]);
   if (error) {
-    console.warn('Erro ao inserir sessão no Supabase (tentando upsert):', error.message);
-    await supabase.from('sessoes').upsert([{ id: sessionId }]);
+    console.warn('Erro ao inserir payload no Supabase (tentando upsert):', error.message);
+    await supabase.from('sessoes').upsert([{ id, offer: payload }]);
   }
 }
 
 /**
- * Transmissor: grava a oferta SDP (offer) na sessão correspondente
+ * Busca o payload (SDP) atrelado a um código curto e o DELETA imediatamente.
+ * Retorna null se não encontrar.
  */
-export async function sendOfferToSession(sessionId: string, offerSdp: string): Promise<void> {
-  const { data, error } = await supabase
-    .from('sessoes')
-    .update({ offer: offerSdp })
-    .eq('id', sessionId)
-    .select('id');
-    
-  if (error) {
-    throw new Error('Falha ao enviar oferta para a sessão: ' + error.message);
+export async function fetchAndDeletePayload(id: string): Promise<string | null> {
+  // Busca o registro
+  const { data, error } = await supabase.from('sessoes').select('offer').eq('id', id).single();
+  
+  if (error || !data || !data.offer) {
+    return null;
   }
 
-  if (!data || data.length === 0) {
-    throw new Error('Sessão não encontrada. Verifique o código digitado no Receptor.');
+  const payload = data.offer;
+
+  // Deleta IMEDIATAMENTE para não deixar rastros (Ponte Cega)
+  try {
+    await supabase.from('sessoes').delete().eq('id', id);
+  } catch (e) {
+    console.warn('Erro ao auto-destruir registro de payload:', e);
   }
+
+  return payload;
 }
 
 /**
- * Receptor: grava a resposta SDP (answer) na sessão correspondente
- */
-export async function sendAnswerToSession(sessionId: string, answerSdp: string): Promise<void> {
-  const { error } = await supabase
-    .from('sessoes')
-    .update({ answer: answerSdp })
-    .eq('id', sessionId);
-
-  if (error) {
-    throw new Error('Falha ao enviar resposta para a sessão: ' + error.message);
-  }
-}
-
-/**
- * Receptor: deleta imediatamente a linha da sessão no Supabase para destruir metadados
+ * Deleta imediatamente a linha da sessão no Supabase para destruir metadados
  */
 export async function deleteSessionRecord(sessionId: string): Promise<void> {
   try {
@@ -68,7 +53,7 @@ export async function deleteSessionRecord(sessionId: string): Promise<void> {
 }
 
 /**
- * Limpeza preventiva de sessões antigas/abandonadas (TTL de 10 minutos)
+ * Limpeza preventiva de payloads antigos (TTL de 10 minutos)
  */
 export async function cleanupStaleSessions(): Promise<void> {
   try {
