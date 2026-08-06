@@ -312,6 +312,22 @@ function init() {
     openCameraBtn.style.display = 'block';
   });
 
+  // Alternadores Bidirecionais de Modo (QR Code vs Escanear/Digitar)
+  const switchToQrBtn = document.getElementById('switch-to-qr-btn');
+  if (switchToQrBtn) {
+    switchToQrBtn.addEventListener('click', () => {
+      if (scanner) scanner.stop();
+      startReceiverFlow();
+    });
+  }
+
+  const switchToScannerBtn = document.getElementById('switch-to-scanner-btn');
+  if (switchToScannerBtn) {
+    switchToScannerBtn.addEventListener('click', () => {
+      startSenderFlow();
+    });
+  }
+
   // Navegação nativa por botão Voltar do dispositivo / navegador
   window.addEventListener('popstate', () => {
     if (!homeSection.classList.contains('active')) {

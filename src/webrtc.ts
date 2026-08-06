@@ -29,8 +29,13 @@ export class WebRTCManager {
     this.pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-      ]
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+      ],
+      iceCandidatePoolSize: 10
     });
 
     this.pc.onconnectionstatechange = () => {
@@ -47,6 +52,7 @@ export class WebRTCManager {
   private setupDataChannel(channel: RTCDataChannel) {
     this.dc = channel;
     this.dc.binaryType = 'arraybuffer';
+    this.dc.bufferedAmountLowThreshold = 256 * 1024; // 256 KB
 
     this.dc.onopen = () => {
       this.events.onDataChannelOpen();
@@ -117,7 +123,7 @@ export class WebRTCManager {
         setTimeout(() => {
           if (this.pc) this.pc.removeEventListener('icegatheringstatechange', checkState);
           resolve();
-        }, 4000);
+        }, 3000);
       }
     });
   }
@@ -140,10 +146,12 @@ export class WebRTCManager {
   }
 
   /**
-   * Envia arquivo pesado (5GB+) fatiado em chunks com controle de backpressure
+   * Envia arquivo em chunks de 64KB com controle estrito de buffer (evita travamento em 0%)
    */
   public async sendFile(file: File, onProgress: (sent: number, total: number) => void): Promise<void> {
-    if (!this.dc || this.dc.readyState !== 'open') throw new Error('Canal de dados não está aberto');
+    if (!this.dc || this.dc.readyState !== 'open') {
+      throw new Error('Canal de dados não está aberto');
+    }
 
     // Enviar metadados do arquivo
     const meta = JSON.stringify({
@@ -153,22 +161,25 @@ export class WebRTCManager {
     });
     this.dc.send(meta);
 
-    const chunkSize = 256 * 1024; // Chunk de 256 KB
+    const chunkSize = 64 * 1024; // 64 KB (padrão cruzado mais estável para WebRTC DataChannel)
     const totalBytes = file.size;
     let offset = 0;
 
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       const sendNextChunk = () => {
         if (!this.dc || this.dc.readyState !== 'open') {
           reject(new Error('Canal de dados fechado durante a transferência'));
           return;
         }
 
-        // Controle de backpressure para arquivos de 5GB+
-        if (this.dc.bufferedAmount > 8 * 1024 * 1024) { // Limiar de 8MB em buffer
-          setTimeout(sendNextChunk, 40);
+        // Controle rigoroso de backpressure (limiar de 256KB em buffer)
+        if (this.dc.bufferedAmount > 256 * 1024) {
+          this.dc.onbufferedamountlow = () => {
+            if (this.dc) this.dc.onbufferedamountlow = null;
+            sendNextChunk();
+          };
           return;
         }
 
@@ -177,15 +188,24 @@ export class WebRTCManager {
       };
 
       reader.onload = () => {
-        if (!this.dc) return;
-        this.dc.send(reader.result as ArrayBuffer);
-        offset += (reader.result as ArrayBuffer).byteLength;
-        onProgress(offset, totalBytes);
+        if (!this.dc || this.dc.readyState !== 'open') {
+          reject(new Error('Canal de dados fechado durante a transferência'));
+          return;
+        }
 
-        if (offset < totalBytes) {
-          sendNextChunk();
-        } else {
-          resolve();
+        try {
+          const buffer = reader.result as ArrayBuffer;
+          this.dc.send(buffer);
+          offset += buffer.byteLength;
+          onProgress(offset, totalBytes);
+
+          if (offset < totalBytes) {
+            sendNextChunk();
+          } else {
+            resolve();
+          }
+        } catch (e) {
+          reject(e);
         }
       };
 
