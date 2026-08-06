@@ -86,7 +86,7 @@ const appDialogOkBtn = document.getElementById('app-dialog-ok-btn') as HTMLButto
 
 function showDialog(message: string, title: string = 'Aviso') {
   appDialogTitle.textContent = title;
-  appDialogMessage.textContent = message;
+  appDialogMessage.innerHTML = message.replace(/\n/g, '<br/>');
   appDialogModal.style.display = 'flex';
 }
 
@@ -282,6 +282,15 @@ function init() {
       cancelAndGoHome(false);
     }
   });
+
+  // Botão de Informação no Rodapé (Sobre / Como funciona)
+  const infoModalBtn = document.getElementById('info-modal-btn') as HTMLButtonElement;
+  if (infoModalBtn) {
+    infoModalBtn.addEventListener('click', () => {
+      const fullInfo = `É uma ferramenta para transferência direta e rápida de arquivos de tamanhos diversos, sem necessidade de cadastro, sem login e sem expor os dados do usuário, operando diretamente na rede local via P2P (WebRTC).\n\nO servidor do Supabase é utilizado exclusivamente como uma ponte rápida de sinalização: ele serve apenas para gerar códigos temporários (QR Code) que viabilizam a identificação e o pareamento inicial dos dispositivos. Assim que a conexão é estabelecida e os aparelhos são emparelhados, todo o registro é imediatamente excluído do servidor, garantindo que nenhum dado ou arquivo transite ou fique armazenado na nuvem.`;
+      showDialog(fullInfo, "Como Funciona o Quick Transfer");
+    });
+  }
 
   // Botões de cancelamento e desconexão explícita
   disconnectBtn.addEventListener('click', () => {

@@ -1,223 +1,310 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Quick Transfer - Air-Gapped Offline Transfer</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="description" content="Transferência de arquivos P2P 100% offline via WebRTC com sinalização por QR Code." />
-    <meta name="theme-color" content="#0f172a" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/src/css/main.css" />
-  </head>
-  <body>
-    <!-- App Header -->
-    <header class="app-header">
-      <div class="brand">
-        <img src="/favicon.svg" width="24" height="24" alt="Quick Transfer Logo" style="display: block; flex-shrink: 0;" />
-        <span>Quick Transfer</span>
-      </div>
-    </header>
 
-    <!-- Modal Pop-up Genérico -->
-    <div id="app-dialog-modal" class="modal-backdrop" style="display: none;">
-      <div class="modal-card" style="max-width: 420px; text-align: center;">
-        <h3 id="app-dialog-title" class="modal-title" style="margin-bottom: 0.75rem;">Aviso</h3>
-        <p id="app-dialog-message" style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.4; word-break: break-word;"></p>
-        <button id="app-dialog-ok-btn" class="btn full-width-btn">OK</button>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Quick Transfer - Air-Gapped Offline Transfer</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="description"
+    content="Transferência de arquivos P2P 100% offline via WebRTC com sinalização por QR Code." />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/css/main.css" />
+</head>
+
+<body>
+  <!-- Modal Pop-up Genérico -->
+  <div id="app-dialog-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card" style="max-width: 440px; text-align: center;">
+      <h3 id="app-dialog-title" class="modal-title" style="margin-bottom: 0.75rem;">Aviso</h3>
+      <p id="app-dialog-message"
+        style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.5; text-align: left; word-break: break-word;">
+      </p>
+      <button id="app-dialog-ok-btn" class="btn full-width-btn">Entendi</button>
     </div>
+  </div>
 
-    <main class="main-container">
-      
-      <!-- SEÇÃO 1: HOME (Escolher Enviar ou Receber) -->
-      <section id="home-section" class="view-section active">
-        
-        <!-- Dropzone de Arquivos -->
-        <div id="file-dropzone-card" class="card" style="margin-bottom: 0.75rem;">
-          <div id="file-dropzone" class="file-dropzone">
-            <input type="file" id="file-input" multiple />
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; color: var(--accent-primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <p style="font-weight: 600; margin-bottom: 0.25rem;">Enviar Arquivo ou Texto</p>
-            <p style="font-size: 0.85rem; color: var(--text-muted);">Toque para selecionar arquivos</p>
-          </div>
-          
-          <div style="margin-top: 1rem;">
-            <textarea id="text-input" placeholder="Ou digite um texto para enviar..." style="width: 100%; height: 85px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-family: inherit; resize: none;"></textarea>
-            <button id="send-text-btn" class="btn full-width-btn" style="margin-top: 0.5rem; display: none;">Enviar Texto</button>
-          </div>
+  <main class="main-container">
+
+    <!-- SEÇÃO 1: HOME (Escolher Enviar ou Receber) -->
+    <section id="home-section" class="view-section active">
+
+      <!-- App Title & Subtitle Centralizados no topo da Home -->
+      <div style="text-align: center; margin-bottom: 1.25rem;">
+        <div
+          style="display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; margin-bottom: 0.4rem;">
+          <img src="/favicon.svg" width="32" height="32" alt="Quick Transfer Logo"
+            style="display: block; flex-shrink: 0;" />
+          <h1 style="font-size: 1.75rem; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.5px;">Quick
+            Transfer</h1>
+        </div>
+        <p
+          style="font-size: 0.85rem; color: var(--text-muted); max-width: 480px; margin: 0 auto; line-height: 1.45; font-weight: 400;">
+          Transferência direta, rápida e privada de arquivos via P2P (WebRTC), sem cadastros ou armazenamento na nuvem.
+        </p>
+      </div>
+
+      <!-- Dropzone de Arquivos -->
+      <div id="file-dropzone-card" class="card" style="margin-bottom: 0.75rem;">
+        <div id="file-dropzone" class="file-dropzone">
+          <input type="file" id="file-input" multiple />
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            style="margin-bottom: 0.5rem; color: var(--accent-primary);">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <p style="font-weight: 600; margin-bottom: 0.25rem;">Enviar Arquivo ou Texto</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Toque para selecionar arquivos</p>
         </div>
 
-        <!-- Previews dos Arquivos -->
-        <div id="file-preview-container" class="card" style="display: none; margin-bottom: 0.75rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-            <h3 style="font-size: 1.05rem;">Arquivos Selecionados:</h3>
-            <button id="toggle-view-btn" class="icon-btn" style="padding: 0.4rem;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            </button>
-          </div>
-          
-          <div id="file-list-display" class="file-list-view" style="max-height: 220px; overflow-y: auto; margin-bottom: 0.75rem;">
-            <!-- Itens de arquivo serão injetados aqui -->
-          </div>
-          
-          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
-            <button id="add-more-files-btn" class="btn btn-secondary full-width-btn">Adicionar mais</button>
-          </div>
-          
-          <button id="start-transfer-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
-            Enviar arquivo
+        <div style="margin-top: 1rem;">
+          <textarea id="text-input" placeholder="Ou digite um texto para enviar..."
+            style="width: 100%; height: 85px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; color: var(--text-primary); font-family: inherit; resize: none;"></textarea>
+          <button id="send-text-btn" class="btn full-width-btn" style="margin-top: 0.5rem; display: none;">Enviar
+            Texto</button>
+        </div>
+      </div>
+
+      <!-- Previews dos Arquivos -->
+      <div id="file-preview-container" class="card" style="display: none; margin-bottom: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1.05rem;">Arquivos Selecionados:</h3>
+          <button id="toggle-view-btn" class="icon-btn" style="padding: 0.4rem;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
           </button>
         </div>
 
-        <div style="display: flex; align-items: center; margin: 0.75rem 0;">
-          <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
-          <span style="padding: 0 1rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">OU</span>
-          <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+        <div id="file-list-display" class="file-list-view"
+          style="max-height: 220px; overflow-y: auto; margin-bottom: 0.75rem;">
+          <!-- Itens de arquivo serão injetados aqui -->
         </div>
 
-        <button id="receive-mode-btn" class="btn btn-secondary full-width-btn" style="padding: 0.85rem; font-size: 1rem;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Receber
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <button id="add-more-files-btn" class="btn btn-secondary full-width-btn">Adicionar mais</button>
+        </div>
+
+        <button id="start-transfer-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
+          Enviar arquivo
         </button>
-      </section>
+      </div>
 
-      <!-- SEÇÃO 2: SCANNER / CONECTAR (Transmissor) -->
-      <section id="scanner-section" class="view-section">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <button id="scanner-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-              <span id="scanner-back-text">Cancelar</span>
-            </button>
-          </div>
-          <span id="scanner-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Conectar ao Receptor</span>
+      <div style="display: flex; align-items: center; margin: 0.75rem 0;">
+        <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+        <span style="padding: 0 1rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">OU</span>
+        <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+      </div>
+
+      <button id="receive-mode-btn" class="btn btn-secondary full-width-btn" style="padding: 0.85rem; font-size: 1rem;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+        Receber
+      </button>
+    </section>
+
+    <!-- SEÇÃO 2: SCANNER / CONECTAR (Transmissor) -->
+    <section id="scanner-section" class="view-section">
+      <div
+        style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button id="scanner-back-btn" class="btn btn-secondary"
+            style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+            <span id="scanner-back-text">Cancelar</span>
+          </button>
         </div>
+        <span id="scanner-title"
+          style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Conectar
+          ao Receptor</span>
+      </div>
 
-        <!-- 1. Digitar Código Manual (Mascara automática QT-) -->
-        <div class="card" style="padding: 1rem; text-align: center; margin-bottom: 0.75rem; box-sizing: border-box; width: 100%;">
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">Digite o código de conexão exibido no Receptor:</p>
-          <div style="display: flex; gap: 0.5rem; width: 100%; box-sizing: border-box; align-items: center;">
-            <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" maxlength="9" style="flex: 1; min-width: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 700; text-transform: uppercase; text-align: center; font-size: 0.95rem; outline: none; box-sizing: border-box; letter-spacing: 1px;" />
-            <button id="connect-code-btn" class="btn" style="flex-shrink: 0; background: var(--accent-primary); padding: 0.65rem 0.9rem; font-size: 0.9rem;">Conectar</button>
-          </div>
-          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; font-weight: 400; text-align: center; opacity: 0.85;">
-            * Dica: Você pode digitar apenas os números e letras (o prefixo "QT-" é inserido automaticamente).
+      <!-- 1. Digitar Código Manual (Mascara automática QT-) -->
+      <div class="card"
+        style="padding: 1rem; text-align: center; margin-bottom: 0.75rem; box-sizing: border-box; width: 100%;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">Digite o
+          código de conexão exibido no Receptor:</p>
+        <div style="display: flex; gap: 0.5rem; width: 100%; box-sizing: border-box; align-items: center;">
+          <input type="text" id="manual-code-input" placeholder="Ex: QT-X1Y2Z3" maxlength="9"
+            style="flex: 1; min-width: 0; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.65rem 0.85rem; border-radius: 8px; font-weight: 700; text-transform: uppercase; text-align: center; font-size: 0.95rem; outline: none; box-sizing: border-box; letter-spacing: 1px;" />
+          <button id="connect-code-btn" class="btn"
+            style="flex-shrink: 0; background: var(--accent-primary); padding: 0.65rem 0.9rem; font-size: 0.9rem;">Conectar</button>
+        </div>
+        <p
+          style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; font-weight: 400; text-align: center; opacity: 0.85;">
+          Você pode só inserir os números
+        </p>
+      </div>
+
+      <div style="display: flex; align-items: center; margin: 0.5rem 0 0.75rem 0;">
+        <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+        <span style="padding: 0 1rem; color: var(--text-muted); font-size: 0.8rem; font-weight: 600;">OU</span>
+        <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+      </div>
+
+      <!-- 2. Botão para Abrir Câmera e Área da Câmera Quadrada -->
+      <div id="camera-trigger-container" style="text-align: center;">
+        <button id="open-camera-btn" class="btn btn-secondary full-width-btn"
+          style="padding: 0.75rem; font-size: 0.95rem; margin-bottom: 0.75rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <span>Escanear QR Code com a Câmera</span>
+        </button>
+      </div>
+
+      <div id="camera-preview-wrapper"
+        style="display: none; flex-direction: column; align-items: center; margin-bottom: 0.75rem; width: 100%;">
+        <div class="card scanner-wrapper-34" style="position: relative; overflow: hidden; margin-bottom: 0.75rem;">
+          <video id="scanner-video" playsinline></video>
+          <canvas id="scanner-overlay" style="z-index: 10;"></canvas>
+        </div>
+        <p id="scanner-instruction"
+          style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
+          Aponte a câmera para o QR Code exibido no Receptor.
+        </p>
+        <button id="close-camera-btn" class="btn btn-secondary"
+          style="font-size: 0.85rem; padding: 0.5rem 1rem; color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          <span>Fechar Câmera</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- SEÇÃO 3: QR CODE DISPLAY (Receptor exibe o QR Code e Código de Sessão) -->
+    <section id="qr-display-section" class="view-section">
+      <div
+        style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button id="qr-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.75rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Cancelar</span>
+          </button>
+        </div>
+        <span
+          style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Aguardando
+          Conexão</span>
+      </div>
+
+      <div class="card" style="text-align: center; padding: 1.25rem;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">Escaneie o QR Code com o
+          dispositivo que enviará os arquivos:</p>
+        <div id="qr-container" style="display: flex; justify-content: center; margin-bottom: 1rem;">
+          <canvas id="qr-canvas"></canvas>
+        </div>
+        <div
+          style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;">
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; font-weight: 500;">Código de
+            Conexão Manual:</p>
+          <p id="session-code-display"
+            style="font-family: monospace; font-size: 1.35rem; font-weight: 700; color: var(--accent-primary); letter-spacing: 2px; margin-top: 0.4rem; user-select: all;">
           </p>
         </div>
+      </div>
+    </section>
 
-        <div style="display: flex; align-items: center; margin: 0.5rem 0 0.75rem 0;">
-          <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
-          <span style="padding: 0 1rem; color: var(--text-muted); font-size: 0.8rem; font-weight: 600;">OU</span>
-          <div style="flex: 1; height: 1px; background: var(--border-color);"></div>
+    <!-- SEÇÃO 4: TRANSFERÊNCIA EM ANDAMENTO & DOWNLOADS -->
+    <section id="transfer-section" class="view-section">
+      <div class="card" style="padding: 1.25rem;">
+        <h2 id="transfer-heading" style="font-size: 1.15rem; margin-bottom: 1rem; text-align: center;">Progresso da
+          Transferência</h2>
+
+        <div id="transfer-progress-wrapper" style="margin-bottom: 1rem;">
+          <div
+            style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">
+            <span id="transfer-bytes-text">0 / 0 MB</span>
+            <span id="transfer-progress-text">0%</span>
+          </div>
+          <div
+            style="width: 100%; height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; border: 1px solid var(--border-color);">
+            <div id="transfer-progress-fill"
+              style="width: 0%; height: 100%; background: var(--accent-primary); transition: width 0.15s linear;"></div>
+          </div>
         </div>
 
-        <!-- 2. Botão para Abrir Câmera e Área da Câmera Quadrada -->
-        <div id="camera-trigger-container" style="text-align: center;">
-          <button id="open-camera-btn" class="btn btn-secondary full-width-btn" style="padding: 0.75rem; font-size: 0.95rem; margin-bottom: 0.75rem;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-            <span>Escanear QR Code com a Câmera</span>
+        <!-- Conteúdo de texto recebido -->
+        <div id="received-text-container" style="display: none; margin-bottom: 1rem;">
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Texto Recebido:</p>
+          <textarea id="received-text-area" readonly
+            style="width: 100%; height: 120px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; color: var(--text-main); font-family: inherit; resize: none; font-size: 0.95rem;"></textarea>
+          <button id="copy-text-btn" class="btn full-width-btn"
+            style="margin-top: 0.5rem; background: var(--accent-primary);">Copiar Texto</button>
+        </div>
+
+        <!-- Botões de Download de arquivos -->
+        <div id="download-buttons-container"
+          style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <!-- Botões de download serão gerados aqui dinamicamente -->
+        </div>
+
+        <!-- Enviar mais arquivos (Remetente) -->
+        <div id="send-more-container"
+          style="display: none; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+          <input type="file" id="send-more-file-input" multiple style="display: none;" />
+          <button id="send-more-files-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Enviar outro arquivo
           </button>
         </div>
 
-        <div id="camera-preview-wrapper" style="display: none; flex-direction: column; align-items: center; margin-bottom: 0.75rem; width: 100%;">
-          <div class="card scanner-wrapper-34" style="position: relative; overflow: hidden; margin-bottom: 0.75rem;">
-            <video id="scanner-video" playsinline></video>
-            <canvas id="scanner-overlay" style="z-index: 10;"></canvas>
-          </div>
-          <p id="scanner-instruction" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
-            Aponte a câmera para o QR Code exibido no Receptor.
-          </p>
-          <button id="close-camera-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem; color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            <span>Fechar Câmera</span>
+        <div style="margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+          <button id="disconnect-btn" class="btn btn-secondary full-width-btn"
+            style="color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
+            Encerrar Conexão
           </button>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- SEÇÃO 3: QR CODE DISPLAY (Receptor exibe o QR Code e Código de Sessão) -->
-      <section id="qr-display-section" class="view-section">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <button id="qr-back-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.55rem 0.85rem; display: inline-flex; align-items: center; gap: 0.4rem;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-              <span id="qr-back-text">Cancelar</span>
-            </button>
-          </div>
-          <span id="qr-display-title" style="font-weight: 700; color: var(--accent-primary); text-align: right; line-height: 1.2; flex: 1; word-break: break-word;">Modo Receptor</span>
-        </div>
+  </main>
 
-        <div class="card grid-display-wrapper" style="padding: 1.25rem 1rem; text-align: center;">
-          <p id="qr-instruction" style="margin-bottom: 0.85rem; font-weight: 600; font-size: 0.95rem;">Escaneie este código no dispositivo transmissor:</p>
-          
-          <div id="qr-container" style="display: flex; justify-content: center; align-items: center; background: white; padding: 0.75rem; border-radius: 12px; margin: 0 auto 1.25rem auto; width: fit-content; max-width: 100%;">
-            <canvas id="qr-canvas" style="display: block; width: 280px; height: 280px; max-width: 100%; height: auto;"></canvas>
-          </div>
-          
-          <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 1rem; border-radius: 10px; width: 100%; box-sizing: border-box;">
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500; display: block;">Código de Conexão Manual:</p>
-            <p id="session-code-display" style="font-size: 1.4rem; font-weight: 700; letter-spacing: 3px; color: var(--accent-primary); margin: 0.25rem 0; line-height: 1.3;">Aguardando...</p>
-          </div>
-        </div>
-      </section>
+  <!-- Footer -->
+  <footer class="app-footer">
+    <button id="info-modal-btn" class="github-link"
+      style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); cursor: pointer; font-family: inherit; font-size: inherit;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
+      </svg>
+      <span>Sobre</span>
+    </button>
+    <a href="https://github.com/disoliveiradso/quick-transfer" target="_blank" rel="noopener noreferrer"
+      class="github-link">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+      </svg>
+      <span>Quick Transfer</span>
+    </a>
+  </footer>
 
-      <!-- SEÇÃO 4: TRANSFERÊNCIA P2P -->
-      <section id="transfer-section" class="view-section">
-        <div class="card" style="text-align: center; margin-top: 0.5rem;">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-success); margin-bottom: 0.75rem;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-          <h2 id="transfer-heading" style="margin-bottom: 0.25rem;">Conexão Estabelecida</h2>
-          <p id="transfer-status" style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.25rem;">Transferindo...</p>
+  <script type="module" src="/src/main.ts"></script>
+</body>
 
-          <div id="transfer-progress-wrapper">
-            <div class="progress-bar-container" style="margin-bottom: 0.5rem;">
-              <div id="transfer-progress-fill" class="progress-fill" style="width: 0%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1.25rem;">
-              <span id="transfer-progress-text">0%</span>
-              <span id="transfer-bytes-text">0 / 0 MB</span>
-            </div>
-          </div>
-
-          <!-- Para visualização de texto recebido -->
-          <div id="received-text-container" style="display: none; text-align: left; margin-bottom: 1.25rem;">
-            <p style="font-weight: 600; margin-bottom: 0.5rem;">Texto Recebido:</p>
-            <div id="received-text-content" style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-word; font-size: 0.9rem;"></div>
-            <button id="copy-text-btn" class="btn btn-secondary full-width-btn" style="margin-top: 0.5rem;">Copiar Texto</button>
-          </div>
-
-          <div id="download-buttons-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
-            <!-- Botões de download serão gerados aqui dinamicamente -->
-          </div>
-
-          <!-- Enviar mais arquivos (Remetente) -->
-          <div id="send-more-container" style="display: none; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
-            <input type="file" id="send-more-file-input" multiple style="display: none;" />
-            <button id="send-more-files-btn" class="btn full-width-btn" style="background: var(--accent-primary);">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Enviar outro arquivo
-            </button>
-          </div>
-
-          <div style="margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
-            <button id="disconnect-btn" class="btn btn-secondary full-width-btn" style="color: var(--accent-danger); border-color: rgba(239, 68, 68, 0.3);">
-              Encerrar Conexão
-            </button>
-          </div>
-        </div>
-      </section>
-
-    </main>
-
-    <!-- Footer -->
-    <footer class="app-footer">
-      <a href="https://github.com/disoliveiradso/quick-transfer" target="_blank" rel="noopener noreferrer" class="github-link">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
-        <span>Quick Transfer</span>
-      </a>
-    </footer>
-
-    <script type="module" src="/src/main.ts"></script>
-  </body>
 </html>
