@@ -210,20 +210,34 @@ function init() {
     startReceiverFlow();
   });
 
-  // Conexão por código manual no Transmissor (Preenche automaticamente o prefixo QT-)
+  // Conexão por código manual no Transmissor: insere automaticamente QT- no início conforme o usuário digita
   manualCodeInput.addEventListener('input', () => {
-    // Remove qualquer prefixo QT- que o usuário tente digitar ou colar
-    let cleanVal = manualCodeInput.value.toUpperCase().replace(/^QT-?/, '').replace(/[^A-Z0-9]/g, '');
-    manualCodeInput.value = cleanVal;
+    let raw = manualCodeInput.value.toUpperCase();
+    
+    // Extrai apenas caracteres alfanuméricos
+    let clean = raw.replace(/[^A-Z0-9]/g, '');
+
+    // Se o usuário digitou ou colou iniciando com QT, remove para não duplicar
+    if (clean.startsWith('QT')) {
+      clean = clean.substring(2);
+    }
+
+    // Limita o sufixo a no máximo 6 caracteres
+    clean = clean.substring(0, 6);
+
+    if (clean.length > 0) {
+      manualCodeInput.value = `QT-${clean}`;
+    } else {
+      manualCodeInput.value = '';
+    }
   });
 
   connectCodeBtn.addEventListener('click', () => {
-    const rawCode = manualCodeInput.value.trim().toUpperCase().replace(/^QT-?/, '');
-    if (!rawCode) {
-      showDialog("Por favor, digite o código exibido no Receptor.");
+    const fullCode = manualCodeInput.value.trim().toUpperCase();
+    if (!fullCode || !fullCode.startsWith('QT-') || fullCode.length < 5) {
+      showDialog("Por favor, digite o código de conexão exibido no Receptor.");
       return;
     }
-    const fullCode = `QT-${rawCode}`;
     handleSenderConnect(fullCode);
   });
 
