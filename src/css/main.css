@@ -98,7 +98,7 @@ body {
   max-width: 1000px;
   width: 100%;
   margin: 0 auto;
-  padding: clamp(1rem, 2.5vh, 1.75rem) 1.25rem;
+  padding: max(2rem, calc(1.5rem + env(safe-area-inset-top))) 1.25rem 1.75rem 1.25rem;
   display: flex;
   flex-direction: column;
 }
