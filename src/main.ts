@@ -387,10 +387,10 @@ function listenForOfferOnSupabase(sessionId: string) {
     stopSupabaseListening();
     audioBeep();
 
-    // CONFIRMAÇÃO / AUTENTICAÇÃO MÚTUA CLIENT-SIDE NO RECEPTOR
+    // ETAPA 2: CONFIRMAÇÃO E AUTENTICAÇÃO MÚTUA CLIENT-SIDE
     const isAccepted = await showConfirmDialog(
-      `Um dispositivo remoto solicitou conexão P2P (Código: ${sessionId}).\n\nDeseja autenticar e aceitar este pareamento?`,
-      "Solicitação de Conexão"
+      `O outro dispositivo solicitou conexão P2P (Código: ${sessionId}).\n\nDeseja autorizar o pareamento criptografado e abrir o túnel direto?`,
+      "Autorização de Pareamento"
     );
 
     if (!isAccepted) {
