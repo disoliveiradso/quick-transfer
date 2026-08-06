@@ -233,16 +233,27 @@ function init() {
   });
 
   connectCodeBtn.addEventListener('click', () => {
-    const fullCode = manualCodeInput.value.trim().toUpperCase();
-    if (!fullCode || !fullCode.startsWith('QT-') || fullCode.length < 5) {
+    let inputVal = manualCodeInput.value.trim().toUpperCase();
+    if (!inputVal) {
       showDialog("Por favor, digite o código de conexão exibido no Receptor.");
       return;
     }
-    handleSenderConnect(fullCode);
+
+    if (!inputVal.startsWith('QT-')) {
+      inputVal = `QT-${inputVal.replace(/^QT-?/, '')}`;
+    }
+
+    if (inputVal.length < 5) {
+      showDialog("Código de conexão muito curto. Verifique o código exibido no Receptor.");
+      return;
+    }
+
+    handleSenderConnect(inputVal);
   });
 
   manualCodeInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       connectCodeBtn.click();
     }
   });
@@ -429,7 +440,12 @@ function startCameraScanner() {
   });
 }
 
-async function handleSenderConnect(sessionId: string) {
+async function handleSenderConnect(rawSessionId: string) {
+  let sessionId = rawSessionId.trim().toUpperCase();
+  if (!sessionId.startsWith('QT-')) {
+    sessionId = `QT-${sessionId.replace(/^QT-?/, '')}`;
+  }
+
   if (scanner) scanner.stop();
   currentSessionId = sessionId;
 
@@ -440,8 +456,9 @@ async function handleSenderConnect(sessionId: string) {
     const offerSdp = await webrtcManager.createOffer();
     await sendOfferToSession(sessionId, offerSdp);
     listenForAnswerOnSupabase(sessionId);
-  } catch (err) {
-    showDialog("Sessão não encontrada ou indisponível.");
+  } catch (err: any) {
+    const msg = err?.message || "Sessão não encontrada. Verifique o código exibido no Receptor.";
+    showDialog(msg, "Erro de Conexão");
     cleanupAndGoHome();
   }
 }

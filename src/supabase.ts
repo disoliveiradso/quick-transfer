@@ -27,13 +27,18 @@ export async function createReceiverSession(sessionId: string): Promise<void> {
  * Transmissor: grava a oferta SDP (offer) na sessão correspondente
  */
 export async function sendOfferToSession(sessionId: string, offerSdp: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('sessoes')
     .update({ offer: offerSdp })
-    .eq('id', sessionId);
+    .eq('id', sessionId)
+    .select('id');
     
   if (error) {
     throw new Error('Falha ao enviar oferta para a sessão: ' + error.message);
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error('Sessão não encontrada. Verifique o código digitado no Receptor.');
   }
 }
 
