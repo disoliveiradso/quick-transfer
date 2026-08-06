@@ -719,19 +719,45 @@ input[type=number]:hover::-webkit-outer-spin-button {
   color: var(--text-main);
 }
 
-/* Footer (Exibido apenas na tela inicial) */
+/* Footer (Exibido apenas na tela inicial - estático para eliminar jitter em scroll no mobile) */
 .app-footer {
   background: transparent;
   border-top: none;
-  padding: 1.25rem 1rem max(1.5rem, calc(1rem + env(safe-area-inset-bottom))) 1rem;
+  padding: 1.25rem 1rem 2rem 1rem;
   margin-top: 1.5rem;
+  margin-bottom: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   font-size: 0.85rem;
   color: var(--text-muted);
   flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .main-container {
+    padding: 1.25rem 1rem 1.5rem 1rem;
+  }
+
+  .hero-header {
+    margin-top: 0.25rem !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .hero-header h1 {
+    font-size: 1.5rem !important;
+  }
+
+  .hero-header img {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .hero-header p {
+    font-size: 0.82rem !important;
+    line-height: 1.45 !important;
+  }
 }
 
 .github-link {
