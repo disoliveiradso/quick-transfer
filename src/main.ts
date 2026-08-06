@@ -443,12 +443,32 @@ async function showQrPage(options: {
 // --------------- Fluxos Principais ---------------
 
 /**
+ * Limpa apenas o estado WebRTC/sessão sem apagar arquivos/texto selecionados.
+ * Use ao iniciar um novo fluxo de envio ou recebimento.
+ */
+function resetWebRTCOnly() {
+  if (scanner) {
+    try { scanner.stop(); } catch (e) {}
+  }
+  if (webrtcManager) {
+    try { webrtcManager.destroy(); } catch (e) {}
+    webrtcManager = null;
+  }
+  if (currentSessionId) {
+    deleteSessionRecord(currentSessionId);
+    currentSessionId = null;
+  }
+  isConnectionEstablished = false;
+  currentRole = null;
+}
+
+/**
  * FLUXO DO RECEPTOR
  * Etapa 1: Escaneia/Digita o código do Transmissor
  * Etapa 2: Exibe o seu QR Code de resposta para o Transmissor escanear
  */
 async function startReceiverFlow() {
-  cleanupAndGoHome();
+  resetWebRTCOnly();          // limpa WebRTC sem apagar arquivos
   cleanupStaleSessions();
   currentRole = 'receiver';
 
@@ -468,7 +488,7 @@ async function startReceiverFlow() {
  * Etapa 2: Escaneia o código 2 gerado pelo Receptor
  */
 async function startSenderFlow() {
-  cleanupAndGoHome();
+  resetWebRTCOnly();          // ← FIX: não apaga selectedFiles nem isTextTransfer!
   cleanupStaleSessions();
   currentRole = 'sender';
 
