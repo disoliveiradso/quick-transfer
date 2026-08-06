@@ -182,7 +182,8 @@ function init() {
   });
 
   copyTextBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(receivedTextContent.textContent || '');
+    const el = receivedTextContent as HTMLTextAreaElement;
+    navigator.clipboard.writeText(el.value || el.textContent || '');
     copyTextBtn.textContent = "Copiado!";
     setTimeout(() => copyTextBtn.textContent = "Copiar Texto", 2000);
   });
@@ -597,19 +598,23 @@ function getWebRTCEvents() {
       
       if (currentRole === 'sender') {
         if (isTextTransfer) {
-          transferHeading.textContent = "Texto Enviado!";
-          transferStatus.textContent = "O texto foi transmitido com sucesso.";
+          transferHeading.textContent = 'Enviando Texto...';
+          if (transferStatus) transferStatus.textContent = 'Transmitindo mensagem de texto...';
+          transferProgressWrapper.style.display = 'none';
           webrtcManager!.sendText(textInput.value);
+          transferHeading.textContent = 'Texto Enviado!';
+          if (transferStatus) transferStatus.textContent = 'A mensagem foi transmitida com sucesso.';
           sendMoreContainer.style.display = 'flex';
         } else {
-          transferHeading.textContent = "Conexão Estabelecida";
+          transferHeading.textContent = 'Conexão Estabelecida';
+          if (transferStatus) transferStatus.textContent = `Enviando arquivo ${currentFileIndex + 1} de ${selectedFiles.length}...`;
           transferProgressWrapper.style.display = 'block';
           currentFileIndex = 0;
           sendNextFile();
         }
       } else {
-        transferHeading.textContent = "Conexão Estabelecida";
-        transferStatus.textContent = "Aguardando transmissão...";
+        transferHeading.textContent = 'Aguardando Arquivo...';
+        if (transferStatus) transferStatus.textContent = 'Conexão P2P estabelecida. Aguardando o envio do transmissor...';
       }
     },
     onDataChannelClose: () => {
@@ -625,15 +630,19 @@ function getWebRTCEvents() {
       cleanupAndGoHome();
     },
     onFileProgress: (bytesReceived: number, totalBytes: number) => {
+      transferProgressWrapper.style.display = 'block';
       if (currentRole === 'receiver') {
-        transferProgressWrapper.style.display = 'block';
-        transferHeading.textContent = "Recebendo Arquivo...";
-        updateProgress(bytesReceived, totalBytes);
+        transferHeading.textContent = 'Recebendo Arquivo...';
+        if (transferStatus) transferStatus.textContent = `Recebendo: ${formatBytes(bytesReceived)} de ${formatBytes(totalBytes)}`;
+      } else {
+        transferHeading.textContent = 'Enviando Arquivo...';
+        if (transferStatus) transferStatus.textContent = `Enviando: ${formatBytes(bytesReceived)} de ${formatBytes(totalBytes)}`;
       }
+      updateProgress(bytesReceived, totalBytes);
     },
     onFileComplete: (file: File) => {
-      transferHeading.textContent = "Arquivo Recebido!";
-      transferStatus.textContent = `O arquivo "${file.name}" foi recebido com sucesso.`;
+      transferHeading.textContent = 'Arquivo Recebido!';
+      if (transferStatus) transferStatus.textContent = `"${file.name}" recebido com sucesso.`;
       transferProgressFill.style.width = '100%';
       transferProgressText.textContent = '100%';
       transferBytesText.textContent = `${formatBytes(file.size)} / ${formatBytes(file.size)}`;
@@ -657,10 +666,11 @@ function getWebRTCEvents() {
       downloadButtonsContainer.appendChild(btn);
     },
     onTextMessage: (text: string) => {
-      transferHeading.textContent = "Mensagem Recebida!";
-      transferStatus.textContent = "O Transmissor enviou um texto.";
+      transferHeading.textContent = 'Mensagem Recebida!';
+      if (transferStatus) transferStatus.textContent = 'O transmissor enviou um texto.';
       receivedTextContainer.style.display = 'block';
-      receivedTextContent.textContent = text;
+      const ta = receivedTextContent as HTMLTextAreaElement;
+      ta.value = text;
     }
   };
 }
@@ -669,22 +679,25 @@ async function sendNextFile() {
   if (!webrtcManager || currentRole !== 'sender' || isTextTransfer) return;
   
   if (currentFileIndex >= selectedFiles.length) {
-    transferHeading.textContent = "Arquivo(s) Enviado(s)!";
-    transferStatus.textContent = "Todos os arquivos foram transmitidos com sucesso.";
+    transferHeading.textContent = 'Arquivo(s) Enviado(s)!';
+    if (transferStatus) transferStatus.textContent = 'Todos os arquivos foram transmitidos com sucesso.';
     sendMoreContainer.style.display = 'flex';
     return;
   }
   
   const file = selectedFiles[currentFileIndex];
-  transferHeading.textContent = "Enviando Arquivo...";
-  transferStatus.textContent = `Enviando ${currentFileIndex + 1} de ${selectedFiles.length}: ${file.name}`;
+  transferHeading.textContent = 'Enviando Arquivo...';
+  if (transferStatus) transferStatus.textContent = `Arquivo ${currentFileIndex + 1} de ${selectedFiles.length}: ${file.name}`;
   
   try {
-    await webrtcManager.sendFile(file, updateProgress);
+    await webrtcManager.sendFile(file, (sent, total) => {
+      updateProgress(sent, total);
+      if (transferStatus) transferStatus.textContent = `Arquivo ${currentFileIndex + 1}/${selectedFiles.length}: ${file.name} — ${formatBytes(sent)} de ${formatBytes(total)}`;
+    });
     currentFileIndex++;
     sendNextFile();
   } catch (err) {
-    showDialog("Erro ao enviar o arquivo: " + file.name);
+    showDialog('Erro ao enviar o arquivo: ' + file.name);
     cleanupAndGoHome();
   }
 }
