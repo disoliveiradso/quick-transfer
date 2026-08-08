@@ -300,7 +300,7 @@ function init() {
   const infoModalBtn = document.getElementById('info-modal-btn') as HTMLButtonElement;
   if (infoModalBtn) {
     infoModalBtn.addEventListener('click', () => {
-      const fullInfo = `É uma ferramenta para transferência direta e rápida de arquivos de tamanhos diversos, sem necessidade de cadastro, sem login e sem expor os dados do usuário, operando diretamente na rede local via P2P (WebRTC).\n\nO servidor do Supabase é utilizado exclusivamente como uma ponte rápida de sinalização: ele serve apenas para gerar códigos temporários (QR Code) que viabilizam a identificação e o pareamento inicial dos dispositivos. Assim que a conexão é estabelecida e os aparelhos são emparelhados, todo o registro é imediatamente excluído do servidor, garantindo que nenhum dado ou arquivo transite ou fique armazenado na nuvem.`;
+      const fullInfo = `O Quick Transfer é uma ferramenta de alta velocidade para transferência direta de arquivos e textos de qualquer tamanho entre dispositivos, sem necessidade de cadastro, conta ou instalação de aplicativo.\n\nO Supabase é utilizado exclusivamente como uma ponte rápida de sinalização para conectar os aparelhos através de QR Code ou código curto. Assim que a conexão P2P é estabelecida, os registros de pareamento são imediatamente excluídos do servidor.\n\nToda a transferência ocorre diretamente de navegador para navegador via WebRTC com criptografia de ponta a ponta, garantindo que nenhum arquivo transite ou fique armazenado na nuvem.`;
       showDialog(fullInfo, "Como Funciona o Quick Transfer");
     });
   }
