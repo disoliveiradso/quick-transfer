@@ -12,13 +12,13 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
  */
 export async function savePayload(id: string, payload: string): Promise<void> {
   // Tenta DELETE primeiro para garantir registro limpo
-  await supabase.from('sessoes').delete().eq('id', id);
+  await supabase.from('quick_transfer_sessoes').delete().eq('id', id);
 
-  const { error } = await supabase.from('sessoes').insert([{ id, offer: payload }]);
+  const { error } = await supabase.from('quick_transfer_sessoes').insert([{ id, offer: payload }]);
   if (error) {
     // Fallback: tenta upsert caso o DELETE não tenha funcionado
     const { error: upsertError } = await supabase
-      .from('sessoes')
+      .from('quick_transfer_sessoes')
       .upsert([{ id, offer: payload }], { onConflict: 'id' });
 
     if (upsertError) {
@@ -41,7 +41,7 @@ export async function fetchAndDeletePayload(
 ): Promise<string | null> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const { data, error } = await supabase
-      .from('sessoes')
+      .from('quick_transfer_sessoes')
       .select('offer')
       .eq('id', id)
       .maybeSingle();
@@ -51,7 +51,7 @@ export async function fetchAndDeletePayload(
 
       // Deleta IMEDIATAMENTE para não deixar rastros (Ponte Cega)
       try {
-        await supabase.from('sessoes').delete().eq('id', id);
+        await supabase.from('quick_transfer_sessoes').delete().eq('id', id);
       } catch (e) {
         console.warn('Aviso: falha ao auto-destruir registro de payload:', e);
       }
@@ -79,7 +79,7 @@ export async function fetchAndDeletePayload(
  */
 export async function deleteSessionRecord(sessionId: string): Promise<void> {
   try {
-    await supabase.from('sessoes').delete().eq('id', sessionId);
+    await supabase.from('quick_transfer_sessoes').delete().eq('id', sessionId);
   } catch (e) {
     console.warn('Aviso: falha ao auto-destruir registro de sessão:', e);
   }
@@ -91,7 +91,7 @@ export async function deleteSessionRecord(sessionId: string): Promise<void> {
 export async function cleanupStaleSessions(): Promise<void> {
   try {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    await supabase.from('sessoes').delete().lt('created_at', tenMinutesAgo);
+    await supabase.from('quick_transfer_sessoes').delete().lt('created_at', tenMinutesAgo);
   } catch (e) {
     // Ignora silenciosamente
   }
